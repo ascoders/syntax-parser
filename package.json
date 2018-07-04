@@ -1,0 +1,14 @@
+{
+  "pri": {
+    "type": "component"
+  },
+  "scripts": {
+    "start": "pri dev",
+    "docs": "pri docs",
+    "build": "pri build",
+    "preview": "pri preview",
+    "analyse": "pri analyse",
+    "test": "pri test",
+    "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'"
+  }
+}

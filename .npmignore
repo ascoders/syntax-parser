@@ -1,0 +1,9 @@
+/node_modules
+/.cache
+/.vscode
+/.temp
+/.DS_Store
+/coverage
+/.nyc_output
+/npm-debug.log
+/tests
