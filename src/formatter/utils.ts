@@ -1,5 +1,5 @@
-import { IToken } from './interface';
-import tokenTypes from './token-types';
+import { IToken } from '../lexer/interface';
+import tokenTypes from '../lexer/token-types';
 
 export function prevTokenIsSemicolon(tokens: IToken[], index: number) {
   let searchIndex = index - 1;

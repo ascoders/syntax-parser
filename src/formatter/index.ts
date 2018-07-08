@@ -1,10 +1,10 @@
 import { trimEnd } from 'lodash';
+import { Tokenizer } from '../lexer';
+import { IToken } from '../lexer/interface';
+import tokenTypes from '../lexer/token-types';
 import Indentation from './indentation';
-import { Tokenizer } from './index';
-import InlineBlock from './inlineBlock';
-import { IToken } from './interface';
+import InlineBlock from './inline-block';
 import Params from './params';
-import tokenTypes from './token-types';
 import {
   nextHasOnlyOneTextUntilReservedWord,
   prevHasOnlyOneTextUntilReservedWord,

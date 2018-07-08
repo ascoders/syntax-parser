@@ -1,0 +1,2 @@
+SELECT CAST(430.120)
+FROM bees

@@ -1,4 +1,4 @@
-import { IToken } from './interface';
+import { IToken } from '../lexer/interface';
 
 /**
  * Handles placeholder replacement with given params.

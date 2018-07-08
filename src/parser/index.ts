@@ -1,5 +1,22 @@
+import { match } from '../../node_modules/@types/minimatch';
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
+import { chainLine, chainLineTry, chainTree, chainTreeTry, execChain, IChain } from './chain';
+import {
+  matchAll,
+  matchCloseParen,
+  matchNumber,
+  matchOpenParen,
+  matchOperator,
+  matchReserved,
+  matchString,
+  matchWord,
+  matchWordOrString,
+  matchWordOrStringOrNumber,
+  skipAtLeastWhitespace,
+  skipWhitespace
+} from './match';
+import { Scanner } from './scanner';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const COMPARISON_OPERATOR = ['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'];
@@ -7,374 +24,212 @@ const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 const logicalOperator = ['AND', '&&', 'XOR', 'OR', '||'];
 
-function isReserved(token: IToken) {
-  return (
-    token.type === tokenTypes.RESERVED ||
-    token.type === tokenTypes.RESERVED_NEWLINE ||
-    token.type === tokenTypes.RESERVED_TOPLEVEL
+// <Statement> := <SelectStatement>
+function statement(scanner: Scanner) {
+  return chainTree(selectStatement(scanner));
+}
+
+// <SelectStatement> := SELECT [SelectList] FROM <TableList> [ WhereStatement ]
+function selectStatement(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      matchReserved(scanner, 'select'),
+      skipAtLeastWhitespace(scanner),
+      selectList(scanner),
+      skipAtLeastWhitespace(scanner),
+      matchReserved(scanner, 'from'),
+      skipAtLeastWhitespace(scanner),
+      tableList(scanner),
+      chainLineTry(skipAtLeastWhitespace(scanner), whereStatement(scanner)),
+      skipWhitespace(scanner)
+    );
+}
+
+// <SelectList> := <SelectField> [ , <SelectList> ]
+function selectList(scanner: Scanner) {
+  return (): IChain =>
+    chainLine(
+      skipWhitespace(scanner),
+      selectField(scanner),
+      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), selectList(scanner))
+    );
+}
+
+// <WhereStatement> := WHERE <Predicate>
+function whereStatement(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      matchReserved(scanner, 'where'),
+      skipAtLeastWhitespace(scanner),
+      predicate(scanner)
+    );
+}
+
+// <SelectField> := <Field> [AS Alias | Alias]
+//                | *
+function selectField(scanner: Scanner) {
+  return () =>
+    chainTree(
+      chainLine(
+        skipWhitespace(scanner),
+        field(scanner),
+        chainLineTry(
+          skipAtLeastWhitespace(scanner),
+          chainTree(
+            chainLine(matchReserved(scanner, 'as'), skipAtLeastWhitespace(scanner), matchWordOrString(scanner)),
+            matchWordOrString(scanner)
+          )
+        )
+      ),
+      chainLine(skipWhitespace(scanner), matchOperator(scanner, '*'))
+    );
+}
+
+// <TableList> := <TableName> [ , <TableList> ]
+function tableList(scanner: Scanner) {
+  return (): IChain =>
+    chainLine(
+      skipWhitespace(scanner),
+      tableName(scanner),
+      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), tableList(scanner))
+    );
+}
+
+// <Predicate> := <Term> [ AND <Predicate> | OR <Predicate> ]
+//              | <Field> BETWEEN <Field> AND <Field>
+// TODO:
+function predicate(scanner: Scanner) {
+  return (): IChain =>
+    chainTree(
+      chainLine(
+        skipWhitespace(scanner),
+        term(scanner),
+        chainLineTry(
+          skipAtLeastWhitespace(scanner),
+          chainTree(
+            chainLine(matchReserved(scanner, 'and'), skipAtLeastWhitespace(scanner), predicate(scanner)),
+            chainLine(matchReserved(scanner, 'or'), skipAtLeastWhitespace(scanner), predicate(scanner))
+          )
+        )
+      ),
+      chainLine(
+        skipWhitespace(scanner),
+        field(scanner),
+        skipAtLeastWhitespace(scanner),
+        matchReserved(scanner, 'between'),
+        skipAtLeastWhitespace(scanner),
+        field(scanner),
+        skipAtLeastWhitespace(scanner),
+        matchReserved(scanner, 'and'),
+        field(scanner)
+      )
+    );
+}
+
+// <Field> :=
+//          | <Function>
+//          | <String>
+//          | <Number>
+//          | <Word>
+function field(scanner: Scanner) {
+  return () => chainTree(functionMatch(scanner), stringMatch(scanner), numberMatch(scanner), wordMatch(scanner));
+}
+
+// TableName [AS Alias | Alias]
+function tableName(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      matchWordOrString(scanner),
+      chainTreeTry(
+        chainLine(
+          skipAtLeastWhitespace(scanner),
+          matchReserved(scanner, 'as'),
+          skipAtLeastWhitespace(scanner),
+          matchWordOrString(scanner)
+        ),
+        chainLine(skipAtLeastWhitespace(scanner), matchWordOrString(scanner))
+      )
+    );
+}
+
+// <Term> := <Constant> COMPARISON_OPERATOR <Constant>
+//         | <Constant>[NOT] IN(<Constant>)
+//         | <Word> LIKE <String>
+// TODO:
+function term(scanner: Scanner) {
+  return chainTree(
+    chainLine(
+      skipWhitespace(scanner),
+      constant(scanner),
+      skipWhitespace(scanner),
+      matchOperator(scanner, COMPARISON_OPERATOR),
+      skipWhitespace(scanner),
+      constant(scanner)
+    ),
+    chainLine(
+      skipWhitespace(scanner),
+      constant(scanner),
+      skipAtLeastWhitespace(scanner),
+      matchOperator(scanner, 'in'),
+      skipAtLeastWhitespace(scanner),
+      constant(scanner)
+    ),
+    chainLine(
+      skipWhitespace(scanner),
+      wordMatch(scanner),
+      skipAtLeastWhitespace(scanner),
+      matchReserved(scanner, 'like'),
+      stringMatch(scanner)
+    )
   );
 }
 
-function isWordOrString(token: IToken) {
-  return token.type === tokenTypes.WORD || token.type === tokenTypes.STRING;
+// <Word> := Word
+function wordMatch(scanner: Scanner) {
+  return () => chainLine(skipWhitespace(scanner), matchWord(scanner));
 }
 
-function isWordOrStringOrNumber(token: IToken) {
-  return token.type === tokenTypes.WORD || token.type === tokenTypes.STRING || token.type === tokenTypes.NUMBER;
+// <String> := String
+function stringMatch(scanner: Scanner) {
+  return () => chainLine(skipWhitespace(scanner), matchString(scanner));
+}
+
+// <Number> := Number
+function numberMatch(scanner: Scanner) {
+  return () => chainLine(skipWhitespace(scanner), matchNumber(scanner));
+}
+
+// <Function> := <Word>(<Number>)
+function functionMatch(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      wordMatch(scanner),
+      matchOpenParen(scanner, '('),
+      skipWhitespace(scanner),
+      numberMatch(scanner),
+      skipWhitespace(scanner),
+      matchCloseParen(scanner, ')')
+    );
+}
+
+// <Constant> := Word | String | Integer
+function constant(scanner: Scanner) {
+  return () => chainLine(skipWhitespace(scanner), matchWordOrStringOrNumber(scanner));
 }
 
 export class AstParser {
-  private index = 0;
-  private root = {};
-  private stacks = [this.root];
-  private tokens: IToken[] = [];
-  private debugLogs: any[] = [];
+  private scanner: Scanner;
 
   constructor(tokens: IToken[]) {
-    this.tokens = tokens;
+    this.scanner = new Scanner(tokens);
   }
 
   public parse = () => {
-    let isParseSuccess = this.statement();
-
-    if (isParseSuccess) {
-      this.jumpWhitespaces();
-
-      if (this.index < this.tokens.length - 1) {
-        isParseSuccess = false;
-        this.debugLog(`Error: unexpected token ${this.tokens[this.index].value}`);
-      }
-    }
-
-    return { isParseSuccess, debugLogs: this.debugLogs };
-  };
-
-  private debugLog = (...messages: any[]) => {
-    this.debugLogs.push(...messages);
-  };
-
-  private debugLogHC = (...messages: any[]) => () => {
-    this.debugLogs.push(...messages);
-    return true;
-  };
-
-  private match = (compare: (token: IToken) => boolean) => () => {
-    const token = this.tokens[this.index];
-    this.debugLog(`match. index: ${this.index}, token:`, token);
-
-    if (!token) {
-      this.debugLog('no word to match');
-      return false;
-    }
-
-    if (compare(token)) {
-      this.index++;
-      this.debugLog('matched');
-      return true;
-    } else {
-      this.debugLog('missMatch');
-      return false;
-    }
-  };
-
-  /**
-   * All matchs must be true.
-   */
-  private matchAll = (...fns: Array<() => boolean>) => () => {
-    const indexSnapshot = this.index;
-    const hasFalse = fns.some(fn => fn() === false);
-
-    if (hasFalse) {
-      // If not match all, reset index
-      this.index = indexSnapshot;
-      return false;
-    }
-
-    return true;
-  };
-
-  /**
-   * Like matchAll but always return true.
-   */
-  private tryMatchAll = (...fns: Array<() => boolean>) => () => {
-    const indexSnapshot = this.index;
-    const hasFalse = fns.some(fn => fn() === false);
-
-    if (hasFalse) {
-      // If not match all, reset index
-      this.index = indexSnapshot;
-      return true;
-    }
-
-    return true;
-  };
-
-  /**
-   * At least match one.
-   */
-  private matchSome = (...fns: Array<() => boolean>) => () => {
-    const indexSnapshot = this.index;
-    const hasTrue = fns.some(fn => fn() === true);
-
-    if (!hasTrue) {
-      // If not match all, reset index
-      this.index = indexSnapshot;
-      return false;
-    }
-
-    return true;
-  };
-
-  private jumpAtLeastOneWhitespace = () => {
-    let hasJump = false;
-    while (this.index < this.tokens.length) {
-      const token = this.tokens[this.index];
-      if (this.tokens[this.index].type !== tokenTypes.WHITESPACE) {
-        break;
-      } else {
-        this.debugLog(`jump. index: ${this.index}, token:`, token);
-        hasJump = true;
-        this.index++;
-      }
-    }
-
-    return hasJump;
-  };
-
-  private jumpWhitespaces = () => {
-    while (this.index < this.tokens.length) {
-      const token = this.tokens[this.index];
-      if (this.tokens[this.index].type !== tokenTypes.WHITESPACE) {
-        break;
-      } else {
-        this.debugLog(`jump. index: ${this.index}, token:`, token);
-        this.index++;
-      }
-    }
-    return true;
-  };
-
-  // <Statement> := <SelectStatement>
-  private statement = () => {
-    return this.selectStatement();
-  };
-
-  // <SelectStatement> := SELECT [SelectList] FROM <TableList> [ WhereStatement ]
-  // TODO:
-  private selectStatement = () => {
-    this.debugLog('Enter selectStatement');
-    return this.matchAll(
-      this.jumpWhitespaces,
-      this.match(token => isReserved(token) && token.value.toLowerCase() === 'select'),
-      this.jumpAtLeastOneWhitespace,
-      this.selectList,
-      this.debugLogHC('Back to selectStatement'),
-      this.jumpAtLeastOneWhitespace,
-      this.match(token => isReserved(token) && token.value.toLowerCase() === 'from'),
-      this.jumpAtLeastOneWhitespace,
-      this.tableList,
-      this.tryMatchAll(this.matchSome(this.matchAll(this.jumpAtLeastOneWhitespace, this.whereStatement)))
-    )();
-  };
-
-  // <WhereStatement> := WHERE <Predicate>
-  private whereStatement = () => {
-    this.debugLog('Enter whereStatement');
-    return this.matchAll(
-      this.jumpWhitespaces,
-      this.match(token => isReserved(token) && token.value.toLowerCase() === 'where'),
-      this.jumpAtLeastOneWhitespace,
-      this.predicate
-    )();
-  };
-
-  // <SelectList> := <SelectField> [ , <SelectList> ]
-  private selectList = (): boolean => {
-    this.debugLog('Enter selectList');
-    return this.matchAll(
-      this.jumpWhitespaces,
-      this.selectField,
-      this.debugLogHC('Back to selectList'),
-      this.tryMatchAll(
-        this.jumpWhitespaces,
-        this.match(token => token.type === tokenTypes.OPERATOR && token.value === ','),
-        this.jumpWhitespaces,
-        this.selectList
-      )
-    )();
-  };
-
-  // <TableList> := <TableName> [ , <TableList> ]
-  private tableList = (): boolean => {
-    this.debugLog('Enter tableList');
-    return this.matchAll(
-      this.jumpWhitespaces,
-      this.tableName,
-      this.debugLogHC('Back to tableList'),
-      this.tryMatchAll(
-        this.jumpWhitespaces,
-        this.match(token => token.type === tokenTypes.OPERATOR && token.value === ','),
-        this.jumpWhitespaces,
-        this.tableList
-      )
-    )();
-  };
-
-  // TableName [AS Alias | Alias]
-  private tableName = () => {
-    this.debugLog('Enter tableName');
-    return this.matchAll(
-      this.jumpWhitespaces,
-      this.match(isWordOrString),
-      this.tryMatchAll(
-        this.jumpAtLeastOneWhitespace,
-        this.matchSome(
-          this.matchAll(
-            this.match(token => isReserved(token) && token.value.toLowerCase() === 'as'),
-            this.jumpAtLeastOneWhitespace,
-            this.match(isWordOrString)
-          ),
-          this.match(isWordOrString)
-        )
-      )
-    )();
-  };
-
-  // <SelectField> := <Field> [AS Alias | Alias]
-  //                | *
-  private selectField = () => {
-    this.debugLog('Enter field');
-    return this.matchSome(
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.field,
-        this.tryMatchAll(
-          this.jumpAtLeastOneWhitespace,
-          this.matchSome(
-            this.matchAll(
-              this.match(token => isReserved(token) && token.value.toLowerCase() === 'as'),
-              this.jumpAtLeastOneWhitespace,
-              this.match(isWordOrString)
-            ),
-            this.match(isWordOrString)
-          )
-        )
-      ),
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.match(token => token.type === tokenTypes.OPERATOR && token.value.toLowerCase() === '*')
-      )
-    )();
-  };
-
-  // <Field> := <Word>
-  //          | <String>
-  //          | <Number>
-  //          | function TODO:
-  private field = () => {
-    this.debugLog('Enter field');
-    return this.matchSome(
-      this.matchAll(this.jumpWhitespaces, this.word),
-      this.matchAll(this.jumpWhitespaces, this.string),
-      this.matchAll(this.jumpWhitespaces, this.number)
-    )();
-  };
-
-  // <Predicate> := <Term> [ AND <Predicate> | OR <Predicate> ]
-  //              | <Field> BETWEEN <Field> AND <Field>
-  // TODO:
-  private predicate = (): boolean => {
-    this.debugLog('Enter predicate');
-    return this.matchSome(
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.term,
-        this.tryMatchAll(
-          this.jumpAtLeastOneWhitespace,
-          this.matchSome(
-            this.matchAll(
-              this.match(token => isReserved(token) && token.value.toLowerCase() === 'and'),
-              this.jumpAtLeastOneWhitespace,
-              this.predicate
-            ),
-            this.matchAll(
-              this.match(token => isReserved(token) && token.value.toLowerCase() === 'or'),
-              this.jumpAtLeastOneWhitespace,
-              this.predicate
-            )
-          )
-        )
-      ),
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.field,
-        this.jumpAtLeastOneWhitespace,
-        this.match(token => isReserved(token) && token.value.toLowerCase() === 'between'),
-        this.jumpAtLeastOneWhitespace,
-        this.field,
-        this.jumpAtLeastOneWhitespace,
-        this.match(token => isReserved(token) && token.value.toLowerCase() === 'and'),
-        this.field
-      )
-    )();
-  };
-
-  // <Term> := <Constant> COMPARISON_OPERATOR <Constant>
-  //         | <Constant>[NOT] IN(<Constant>)
-  //         | <Word> LIKE <String>
-  // TODO:
-  private term = () => {
-    this.debugLog('Enter term');
-    return this.matchSome(
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.constant,
-        this.jumpWhitespaces,
-        this.match(
-          token =>
-            token.type === tokenTypes.OPERATOR &&
-            COMPARISON_OPERATOR.some(comparison => comparison === token.value.toLowerCase())
-        ),
-        this.jumpWhitespaces,
-        this.constant
-      ),
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.constant,
-        this.jumpAtLeastOneWhitespace,
-        this.match(token => token.type === tokenTypes.OPERATOR && token.value.toLowerCase() === 'in'),
-        this.jumpAtLeastOneWhitespace,
-        this.constant
-      ),
-      this.matchAll(
-        this.jumpWhitespaces,
-        this.word,
-        this.jumpAtLeastOneWhitespace,
-        this.match(token => isReserved(token) && token.value.toLowerCase() === 'like'),
-        this.string
-      )
-    )();
-  };
-
-  // <Constant> := Word | String | Integer
-  // TODO:
-  private constant = () => {
-    this.debugLog('Enter constant');
-    return this.matchAll(this.jumpWhitespaces, this.match(isWordOrStringOrNumber))();
-  };
-
-  private word = () => {
-    this.debugLog('Enter word');
-    return this.matchAll(this.jumpWhitespaces, this.match(token => token.type === tokenTypes.WORD))();
-  };
-
-  private string = () => {
-    this.debugLog('Enter string');
-    return this.matchAll(this.jumpWhitespaces, this.match(token => token.type === tokenTypes.STRING))();
-  };
-
-  private number = () => {
-    this.debugLog('Enter number');
-    return this.matchAll(this.jumpWhitespaces, this.match(token => token.type === tokenTypes.NUMBER))();
+    const node = statement(this.scanner)();
+    return execChain(node, this.scanner);
   };
 }

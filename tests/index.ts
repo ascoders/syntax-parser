@@ -36,20 +36,22 @@ sqlTests.forEach(sqlTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
       const tokenizer = new Tokenizer(tokenConfig);
       const tokens = tokenizer.tokenize(eachTest.content);
-      const astInfo = new AstParser(tokens).parse();
+      const result = new AstParser(tokens).parse();
 
-      if (!astInfo.isParseSuccess) {
-        // tslint:disable:no-console
-        console.log('');
-        console.log('Original sql:');
-        console.log(eachTest.content);
-        console.log('');
-        console.log('Tokens:');
-        console.log(tokens);
-        console.log('');
-      }
+      t.true(result);
 
-      t.true(astInfo.isParseSuccess);
+      // if (!astInfo.isParseSuccess) {
+      //   // tslint:disable:no-console
+      //   console.log('');
+      //   console.log('Original sql:');
+      //   console.log(eachTest.content);
+      //   console.log('');
+      //   console.log('Tokens:');
+      //   console.log(tokens);
+      //   console.log('');
+      // }
+
+      // t.true(astInfo.isParseSuccess);
     });
   });
 });

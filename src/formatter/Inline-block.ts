@@ -1,5 +1,5 @@
-import { IToken } from './interface';
-import tokenTypes from './token-types';
+import { IToken } from '../lexer/interface';
+import tokenTypes from '../lexer/token-types';
 
 const INLINE_MAX_LENGTH = 50;
 
