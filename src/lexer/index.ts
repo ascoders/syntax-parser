@@ -18,7 +18,6 @@ export class Tokenizer {
   private INDEXED_PLACEHOLDER_REGEX: RegExp | false;
   private IDENT_NAMED_PLACEHOLDER_REGEX: RegExp | false;
   private STRING_NAMED_PLACEHOLDER_REGEX: RegExp | false;
-  private VARIABLE_REGEX: RegExp | false;
 
   /**
    * @param {Object} cfg
@@ -57,8 +56,6 @@ export class Tokenizer {
       cfg.namedPlaceholderTypes,
       this.createStringPattern(cfg.stringTypes)
     );
-
-    this.VARIABLE_REGEX = this.createStartEndPlaceholderRegex(cfg.startEndVariables, cfg.indentRegex);
   }
 
   /**

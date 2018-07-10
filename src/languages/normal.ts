@@ -1,5 +1,3 @@
-import { Tokenizer } from '../lexer';
-
 const reservedWords = [
   'ACCESSIBLE',
   'ACTION',
@@ -332,7 +330,7 @@ export const tokenConfig = {
   openParens: ['(', 'CASE'],
   closeParens: [')', 'END'],
   indexedPlaceholderTypes: ['?'],
-  namedPlaceholderTypes: [':', '.'],
+  // namedPlaceholderTypes: [':', '.'],
   specialWordChars: [
     `\\$\\{${validateText}+\\}`,
     `${validateText}+\\.${validateText}+`,

@@ -67,22 +67,12 @@ function whereStatement(scanner: Scanner) {
     );
 }
 
-// <SelectField> := <Field> [AS Alias | Alias]
+// <SelectField> := <Field> [Alias]
 //                | *
 function selectField(scanner: Scanner) {
   return () =>
     chainTree(
-      chainLine(
-        skipWhitespace(scanner),
-        field(scanner),
-        chainLineTry(
-          skipAtLeastWhitespace(scanner),
-          chainTree(
-            chainLine(matchReserved(scanner, 'as'), skipAtLeastWhitespace(scanner), matchWordOrString(scanner)),
-            matchWordOrString(scanner)
-          )
-        )
-      ),
+      chainLine(skipWhitespace(scanner), field(scanner), chainLineTry(alias(scanner))),
       chainLine(skipWhitespace(scanner), matchOperator(scanner, '*'))
     );
 }
@@ -137,21 +127,26 @@ function field(scanner: Scanner) {
   return () => chainTree(functionMatch(scanner), stringMatch(scanner), numberMatch(scanner), wordMatch(scanner));
 }
 
-// TableName [AS Alias | Alias]
+// TableName := WordOrString [Alias]
 function tableName(scanner: Scanner) {
+  return () => chainLine(skipWhitespace(scanner), matchWordOrString(scanner), chainLineTry(alias(scanner)));
+}
+
+// Alias := AS Word
+//        | AS'String
+//        | WordOrString
+function alias(scanner: Scanner) {
   return () =>
-    chainLine(
-      skipWhitespace(scanner),
-      matchWordOrString(scanner),
-      chainTreeTry(
-        chainLine(
-          skipAtLeastWhitespace(scanner),
-          matchReserved(scanner, 'as'),
-          skipAtLeastWhitespace(scanner),
-          matchWordOrString(scanner)
-        ),
-        chainLine(skipAtLeastWhitespace(scanner), matchWordOrString(scanner))
-      )
+    chainTree(
+      chainLine(
+        skipWhitespace(scanner),
+        matchReserved(scanner, 'as'),
+        chainTree(
+          chainLine(skipAtLeastWhitespace(scanner), matchWord(scanner)),
+          chainLine(skipWhitespace(scanner), matchString(scanner))
+        )
+      ),
+      chainLine(skipWhitespace(scanner), matchWordOrString(scanner))
     );
 }
 

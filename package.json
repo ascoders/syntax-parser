@@ -10,5 +10,8 @@
     "analyse": "pri analyse",
     "test": "pri test",
     "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'"
+  },
+  "dependencies": {
+    "pri": "^0.9.18"
   }
 }

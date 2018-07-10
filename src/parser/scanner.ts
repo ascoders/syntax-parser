@@ -26,7 +26,6 @@ export class Scanner {
   public setIndex = (index: number) => (this.index = index);
 
   public isEnd = () => {
-    console.log('token last', this.tokens.slice(this.index));
     return this.index >= this.tokens.length - 1;
   };
 }
