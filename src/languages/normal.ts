@@ -330,12 +330,9 @@ export const tokenConfig = {
   openParens: ['(', 'CASE'],
   closeParens: [')', 'END'],
   indexedPlaceholderTypes: ['?'],
-  // namedPlaceholderTypes: [':', '.'],
-  specialWordChars: [
+  namedPlaceholderTypes: [':', '.'],
+  wordChars: [
     `\\$\\{${validateText}+\\}`,
-    `${validateText}+\\.${validateText}+`,
-    `${validateText}+\\.\\*`,
-    `${validateText}+\\:${validateText}+`,
     `${validateText}+`
   ],
   lineCommentTypes: ['#', '--']

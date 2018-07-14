@@ -120,11 +120,19 @@ function predicate(scanner: Scanner) {
 
 // <Field> :=
 //          | <Function>
-//          | <String>
 //          | <Number>
-//          | <Word>
+//          | <StringOrWord>.*
+//          | <StringOrWord>.<StringOrWord>
+//          | <StringOrWord>
 function field(scanner: Scanner) {
-  return () => chainTree(functionMatch(scanner), stringMatch(scanner), numberMatch(scanner), wordMatch(scanner));
+  return () =>
+    chainTree(
+      functionMatch(scanner),
+      numberMatch(scanner),
+      chainLine(stringOrWordMatch(scanner), matchOperator(scanner, '.'), matchOperator(scanner, '*')),
+      chainLine(stringOrWordMatch(scanner), matchOperator(scanner, '.'), stringOrWordMatch(scanner)),
+      stringOrWordMatch(scanner)
+    );
 }
 
 // TableName := WordOrString [Alias]
@@ -192,12 +200,16 @@ function stringMatch(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchString(scanner));
 }
 
+function stringOrWordMatch(scanner: Scanner) {
+  return () => chainTree(wordMatch(scanner), stringMatch(scanner));
+}
+
 // <Number> := Number
 function numberMatch(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchNumber(scanner));
 }
 
-// <Function> := <Word>(<Number>)
+// <Function> := <Word>(<Number> | *)
 function functionMatch(scanner: Scanner) {
   return () =>
     chainLine(
@@ -205,7 +217,7 @@ function functionMatch(scanner: Scanner) {
       wordMatch(scanner),
       matchOpenParen(scanner, '('),
       skipWhitespace(scanner),
-      numberMatch(scanner),
+      chainTree(numberMatch(scanner), matchOperator(scanner, '*')),
       skipWhitespace(scanner),
       matchCloseParen(scanner, ')')
     );

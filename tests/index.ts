@@ -38,6 +38,11 @@ sqlTests.forEach(sqlTest => {
       const tokens = tokenizer.tokenize(eachTest.content);
       const result = new AstParser(tokens).parse();
 
+      if (!result) { 
+        console.log('tokens')
+        console.log(tokens)
+      }
+
       t.true(result);
 
       // if (!astInfo.isParseSuccess) {
