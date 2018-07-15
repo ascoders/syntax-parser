@@ -1,4 +1,3 @@
-import { match } from '../../node_modules/@types/minimatch';
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
 import { chainLine, chainLineTry, chainTree, chainTreeTry, execChain, IChain } from './chain';
