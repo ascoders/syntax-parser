@@ -9,9 +9,19 @@
     "preview": "pri preview",
     "analyse": "pri analyse",
     "test": "pri test",
-    "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'"
+    "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'",
+    "antlr4": "antlr4 -Dlanguage=JavaScript src/SqlLexer.g4",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "pri": "^0.9.18"
+    "antlr4": "^4.7.1",
+    "pri": "^0.9.18",
+    "@babel/runtime": "^7.0.0-beta.51"
+  },
+  "main": "dist/src/index.js",
+  "types": "src/index.tsx",
+  "peerDependencies": {
+    "react": ">=16.0.0",
+    "react-dom": ">=16.0.0"
   }
 }

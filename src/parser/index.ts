@@ -19,17 +19,15 @@ import {
 import { Scanner } from './scanner';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
-const COMPARISON_OPERATOR = ['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
-const logicalOperator = ['AND', '&&', 'XOR', 'OR', '||'];
 
-// <Statement> := <SelectStatement>
+// <Statement> ::= <SelectStatement>
 function statement(scanner: Scanner) {
   return chainTree(selectStatement(scanner));
 }
 
-// <SelectStatement> := SELECT [SelectList] FROM <TableList> [ WhereStatement ]
+// <SelectStatement> ::= SELECT [SelectList] FROM <TableList> WhereStatement?
 function selectStatement(scanner: Scanner) {
   return () =>
     chainLine(
@@ -46,7 +44,7 @@ function selectStatement(scanner: Scanner) {
     );
 }
 
-// <SelectList> := <SelectField> [ , <SelectList> ]
+// <SelectList> ::= <SelectField> ( , <SelectList> )?
 function selectList(scanner: Scanner) {
   return (): IChain =>
     chainLine(
@@ -56,19 +54,19 @@ function selectList(scanner: Scanner) {
     );
 }
 
-// <WhereStatement> := WHERE <Predicate>
+// whereStatement ::= WHERE expression
 function whereStatement(scanner: Scanner) {
   return () =>
     chainLine(
       skipWhitespace(scanner),
       matchReserved(scanner, 'where'),
       skipAtLeastWhitespace(scanner),
-      predicate(scanner)
+      expression(scanner)
     );
 }
 
-// <SelectField> := <Field> [Alias]
-//                | *
+// <SelectField> ::= <Field> Alias?
+//                 | *
 function selectField(scanner: Scanner) {
   return () =>
     chainTree(
@@ -77,7 +75,18 @@ function selectField(scanner: Scanner) {
     );
 }
 
-// <TableList> := <TableName> [ , <TableList> ]
+// fieldList
+//       ::= field (, fieldList)?
+function fieldList(scanner: Scanner) {
+  return (): IChain =>
+    chainLine(
+      skipWhitespace(scanner),
+      field(scanner),
+      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), fieldList(scanner))
+    );
+}
+
+// <TableList> ::= <TableName> ( , <TableList> )?
 function tableList(scanner: Scanner) {
   return (): IChain =>
     chainLine(
@@ -87,43 +96,116 @@ function tableList(scanner: Scanner) {
     );
 }
 
-// <Predicate> := <Term> [ AND <Predicate> | OR <Predicate> ]
-//              | <Field> BETWEEN <Field> AND <Field>
-// TODO:
+// expression
+//        ::= notOperator expression
+//          | notOperator '(' expression ')'
+//          | predicate logicalOperator expression
+//          | '(' expression ')' logicalOperator '(' expression ')'
+//          | predicate IS NOT? (TRUE | FALSE | UNKNOWN)
+//          | predicate
+function expression(scanner: Scanner) {
+  return (): IChain =>
+    chainLine(
+      skipWhitespace(scanner),
+      chainTree(
+        chainLine(notOperator(scanner), skipAtLeastWhitespace(scanner), expression(scanner)),
+        chainLine(
+          notOperator(scanner),
+          skipWhitespace(scanner),
+          matchOpenParen(scanner, '('),
+          skipWhitespace(scanner),
+          expression(scanner),
+          skipWhitespace(scanner),
+          matchCloseParen(scanner, ')')
+        ),
+        chainLine(
+          predicate(scanner),
+          skipAtLeastWhitespace(scanner),
+          logicalOperator(scanner),
+          skipAtLeastWhitespace(scanner),
+          expression(scanner)
+        ),
+        chainLine(
+          matchOpenParen(scanner, '('),
+          skipWhitespace(scanner),
+          predicate(scanner),
+          skipWhitespace(scanner),
+          matchCloseParen(scanner, ')'),
+          skipWhitespace(scanner),
+          logicalOperator(scanner),
+          skipWhitespace(scanner),
+          matchOpenParen(scanner, '('),
+          skipWhitespace(scanner),
+          predicate(scanner),
+          skipWhitespace(scanner),
+          matchCloseParen(scanner, ')')
+        ),
+        chainLine(
+          predicate(scanner),
+          matchReserved(scanner, 'is'),
+          chainLineTry(matchReserved(scanner, 'not')),
+          chainTree(matchReserved(scanner, 'true'), matchReserved(scanner, 'false'), matchReserved(scanner, 'unknown'))
+        ),
+        predicate(scanner)
+      )
+    );
+}
+
+// predicate
+//       ::= predicate NOT? IN '(' fieldList ')'
+//         | left=predicate comparisonOperator right=predicate
+//         | predicate NOT? BETWEEN predicate AND predicate
+//         | predicate SOUNDS LIKE predicate
+//         | predicate NOT? LIKE predicate (ESCAPE STRING_LITERAL)?
+//         | field
 function predicate(scanner: Scanner) {
   return (): IChain =>
-    chainTree(
-      chainLine(
-        skipWhitespace(scanner),
-        term(scanner),
-        chainLineTry(
+    chainLine(
+      skipWhitespace(scanner),
+      chainTree(
+        chainLine(
+          field(scanner),
+          chainLineTry(skipAtLeastWhitespace(scanner), matchReserved(scanner, 'not')),
           skipAtLeastWhitespace(scanner),
-          chainTree(
-            chainLine(matchReserved(scanner, 'and'), skipAtLeastWhitespace(scanner), predicate(scanner)),
-            chainLine(matchReserved(scanner, 'or'), skipAtLeastWhitespace(scanner), predicate(scanner))
-          )
-        )
-      ),
-      chainLine(
-        skipWhitespace(scanner),
-        field(scanner),
-        skipAtLeastWhitespace(scanner),
-        matchReserved(scanner, 'between'),
-        skipAtLeastWhitespace(scanner),
-        field(scanner),
-        skipAtLeastWhitespace(scanner),
-        matchReserved(scanner, 'and'),
+          matchReserved(scanner, 'in'),
+          skipWhitespace(scanner),
+          matchOpenParen(scanner, '('),
+          skipWhitespace(scanner),
+          fieldList(scanner),
+          skipWhitespace(scanner),
+          matchCloseParen(scanner, ')')
+        ),
+        chainLine(
+          field(scanner),
+          skipWhitespace(scanner),
+          comparisonOperator(scanner),
+          skipWhitespace(scanner),
+          field(scanner)
+        ),
+        chainLine(
+          field(scanner),
+          chainLineTry(skipAtLeastWhitespace(scanner), matchReserved(scanner, 'not')),
+          skipAtLeastWhitespace(scanner),
+          matchReserved(scanner, 'between'),
+          skipAtLeastWhitespace(scanner),
+          predicate(scanner),
+          skipAtLeastWhitespace(scanner),
+          matchReserved(scanner, 'and'),
+          skipAtLeastWhitespace(scanner),
+          predicate(scanner)
+        ),
+        chainLine(field(scanner), skipAtLeastWhitespace(scanner), matchReserved(scanner, 'like'), stringMatch(scanner)),
         field(scanner)
       )
     );
 }
 
-// <Field> :=
-//          | <Function>
-//          | <Number>
-//          | <StringOrWord>.*
-//          | <StringOrWord>.<StringOrWord>
-//          | <StringOrWord>
+// field
+//   ::= <function>
+//     | <number>
+//     | <stringOrWord>.*
+//     | <stringOrWord>.<stringOrWord>
+//     | <stringOrWord>
 function field(scanner: Scanner) {
   return () =>
     chainTree(
@@ -135,14 +217,14 @@ function field(scanner: Scanner) {
     );
 }
 
-// TableName := WordOrString [Alias]
+// TableName ::= WordOrString [Alias]
 function tableName(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchWordOrString(scanner), chainLineTry(alias(scanner)));
 }
 
-// Alias := AS Word
-//        | AS'String
-//        | WordOrString
+// Alias ::= AS Word
+//         | AS'String
+//         | WordOrString
 function alias(scanner: Scanner) {
   return () =>
     chainTree(
@@ -158,44 +240,12 @@ function alias(scanner: Scanner) {
     );
 }
 
-// <Term> := <Constant> COMPARISON_OPERATOR <Constant>
-//         | <Constant>[NOT] IN(<Constant>)
-//         | <Word> LIKE <String>
-// TODO:
-function term(scanner: Scanner) {
-  return chainTree(
-    chainLine(
-      skipWhitespace(scanner),
-      constant(scanner),
-      skipWhitespace(scanner),
-      matchOperator(scanner, COMPARISON_OPERATOR),
-      skipWhitespace(scanner),
-      constant(scanner)
-    ),
-    chainLine(
-      skipWhitespace(scanner),
-      constant(scanner),
-      skipAtLeastWhitespace(scanner),
-      matchOperator(scanner, 'in'),
-      skipAtLeastWhitespace(scanner),
-      constant(scanner)
-    ),
-    chainLine(
-      skipWhitespace(scanner),
-      wordMatch(scanner),
-      skipAtLeastWhitespace(scanner),
-      matchReserved(scanner, 'like'),
-      stringMatch(scanner)
-    )
-  );
-}
-
-// <Word> := Word
+// <Word> ::= Word
 function wordMatch(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchWord(scanner));
 }
 
-// <String> := String
+// <String> ::= String
 function stringMatch(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchString(scanner));
 }
@@ -204,12 +254,12 @@ function stringOrWordMatch(scanner: Scanner) {
   return () => chainTree(wordMatch(scanner), stringMatch(scanner));
 }
 
-// <Number> := Number
+// <Number> ::= Number
 function numberMatch(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchNumber(scanner));
 }
 
-// <Function> := <Word>(<Number> | *)
+// <Function> ::= <Word>(<Number> | *)
 function functionMatch(scanner: Scanner) {
   return () =>
     chainLine(
@@ -223,9 +273,21 @@ function functionMatch(scanner: Scanner) {
     );
 }
 
-// <Constant> := Word | String | Integer
+// <Constant> ::= Word | String | Integer
 function constant(scanner: Scanner) {
   return () => chainLine(skipWhitespace(scanner), matchWordOrStringOrNumber(scanner));
+}
+
+function logicalOperator(scanner: Scanner) {
+  return () => chainLine(matchReserved(scanner, ['and', '&&', 'xor', 'or', '||']));
+}
+
+function comparisonOperator(scanner: Scanner) {
+  return () => chainLine(matchOperator(scanner, ['=', '>', '<', '<=', '>=', '<>', '!=', '<=>']));
+}
+
+function notOperator(scanner: Scanner) {
+  return matchReserved(scanner, ['not', '!']);
 }
 
 export class AstParser {

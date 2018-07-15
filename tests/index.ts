@@ -34,29 +34,17 @@ sqlGroups.forEach(sqlGroup => {
 sqlTests.forEach(sqlTest => {
   sqlTest.childs.forEach(eachTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
+      t.true(true);
       const tokenizer = new Tokenizer(tokenConfig);
       const tokens = tokenizer.tokenize(eachTest.content);
       const result = new AstParser(tokens).parse();
 
-      if (!result) { 
-        console.log('tokens')
-        console.log(tokens)
+      if (!result) {
+        console.log('tokens');
+        console.log(tokens);
       }
 
       t.true(result);
-
-      // if (!astInfo.isParseSuccess) {
-      //   // tslint:disable:no-console
-      //   console.log('');
-      //   console.log('Original sql:');
-      //   console.log(eachTest.content);
-      //   console.log('');
-      //   console.log('Tokens:');
-      //   console.log(tokens);
-      //   console.log('');
-      // }
-
-      // t.true(astInfo.isParseSuccess);
     });
   });
 });
