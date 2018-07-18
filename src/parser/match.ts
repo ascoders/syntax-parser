@@ -1,5 +1,6 @@
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
+import { chainLine, chainLineTry, IChain } from './chain';
 import { Scanner } from './scanner';
 
 export type IMatch = boolean;
@@ -109,4 +110,8 @@ export const matchAll = () => {
   }
   foo.prototype.name = 'match';
   return foo;
+};
+
+export const matchPlus = (scanner: Scanner, fn: () => IChain) => {
+  return (): IChain => chainLine(fn, chainLineTry(skipAtLeastWhitespace(scanner), matchPlus(scanner, fn)));
 };

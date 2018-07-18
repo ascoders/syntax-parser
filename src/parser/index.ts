@@ -7,6 +7,7 @@ import {
   matchNumber,
   matchOpenParen,
   matchOperator,
+  matchPlus,
   matchReserved,
   matchString,
   matchWord,
@@ -64,12 +65,15 @@ function whereStatement(scanner: Scanner) {
     );
 }
 
-// <SelectField> ::= <Field> Alias?
-//                 | *
+// selectField
+//         ::= field alias?
+//           | caseStatement alias?
+//           | *
 function selectField(scanner: Scanner) {
   return () =>
     chainTree(
       chainLine(skipWhitespace(scanner), field(scanner), chainLineTry(alias(scanner))),
+      chainLine(skipWhitespace(scanner), caseStatement(scanner), chainLineTry(alias(scanner))),
       chainLine(skipWhitespace(scanner), matchOperator(scanner, '*'))
     );
 }
@@ -236,6 +240,40 @@ function alias(scanner: Scanner) {
         )
       ),
       chainLine(skipWhitespace(scanner), matchWordOrString(scanner))
+    );
+}
+
+// caseStatement
+//           ::= CASE caseAlternative+ ELSE string END
+function caseStatement(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      matchOpenParen(scanner, 'case'),
+      skipAtLeastWhitespace(scanner),
+      matchPlus(scanner, caseAlternative(scanner)),
+      skipAtLeastWhitespace(scanner),
+      matchReserved(scanner, 'else'),
+      skipAtLeastWhitespace(scanner),
+      stringMatch(scanner),
+      skipAtLeastWhitespace(scanner),
+      matchCloseParen(scanner, 'end')
+    );
+}
+
+// caseAlternative
+//             ::= WHEN expression THEN string
+function caseAlternative(scanner: Scanner) {
+  return () =>
+    chainLine(
+      skipWhitespace(scanner),
+      matchReserved(scanner, 'when'),
+      skipAtLeastWhitespace(scanner),
+      expression(scanner),
+      skipAtLeastWhitespace(scanner),
+      matchReserved(scanner, 'then'),
+      skipAtLeastWhitespace(scanner),
+      stringMatch(scanner)
     );
 }
 
