@@ -44,27 +44,6 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch) {
   };
 }
 
-function meetWhitespace(scanner: Scanner) {
-  let lastIsWhitespace = true;
-  let meetWhitespaceCount = 0;
-  while (lastIsWhitespace) {
-    lastIsWhitespace = matchToken(scanner, token => token.type === tokenTypes.WHITESPACE);
-    if (lastIsWhitespace) {
-      meetWhitespaceCount++;
-    }
-  }
-  return meetWhitespaceCount;
-}
-
-export const skipWhitespace = createMatch(scanner => {
-  meetWhitespace(scanner);
-  return true;
-});
-
-export const skipAtLeastWhitespace = createMatch(scanner => {
-  return meetWhitespace(scanner) > 0;
-});
-
 export const matchReserved = createMatch((scanner, word: string | string[]) =>
   matchToken(scanner, token => isTypeReserved(token) && equalWordOrIncludeWords(token.value, word))
 );
@@ -113,5 +92,5 @@ export const matchAll = () => {
 };
 
 export const matchPlus = (scanner: Scanner, fn: () => IChain) => {
-  return (): IChain => chainLine(fn, chainLineTry(skipAtLeastWhitespace(scanner), matchPlus(scanner, fn)));
+  return (): IChain => chainLine(fn, chainLineTry(matchPlus(scanner, fn)));
 };

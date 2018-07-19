@@ -12,9 +12,7 @@ import {
   matchString,
   matchWord,
   matchWordOrString,
-  matchWordOrStringOrNumber,
-  skipAtLeastWhitespace,
-  skipWhitespace
+  matchWordOrStringOrNumber
 } from './match';
 import { Scanner } from './scanner';
 
@@ -31,38 +29,22 @@ function statement(scanner: Scanner) {
 function selectStatement(scanner: Scanner) {
   return () =>
     chainLine(
-      skipWhitespace(scanner),
       matchReserved(scanner, 'select'),
-      skipAtLeastWhitespace(scanner),
       selectList(scanner),
-      skipAtLeastWhitespace(scanner),
       matchReserved(scanner, 'from'),
-      skipAtLeastWhitespace(scanner),
       tableList(scanner),
-      chainLineTry(skipAtLeastWhitespace(scanner), whereStatement(scanner)),
-      skipWhitespace(scanner)
+      chainLineTry(whereStatement(scanner))
     );
 }
 
 // <SelectList> ::= <SelectField> ( , <SelectList> )?
 function selectList(scanner: Scanner) {
-  return (): IChain =>
-    chainLine(
-      skipWhitespace(scanner),
-      selectField(scanner),
-      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), selectList(scanner))
-    );
+  return (): IChain => chainLine(selectField(scanner), chainLineTry(matchOperator(scanner, ','), selectList(scanner)));
 }
 
 // whereStatement ::= WHERE expression
 function whereStatement(scanner: Scanner) {
-  return () =>
-    chainLine(
-      skipWhitespace(scanner),
-      matchReserved(scanner, 'where'),
-      skipAtLeastWhitespace(scanner),
-      expression(scanner)
-    );
+  return () => chainLine(matchReserved(scanner, 'where'), expression(scanner));
 }
 
 // selectField
@@ -72,31 +54,21 @@ function whereStatement(scanner: Scanner) {
 function selectField(scanner: Scanner) {
   return () =>
     chainTree(
-      chainLine(skipWhitespace(scanner), field(scanner), chainLineTry(alias(scanner))),
-      chainLine(skipWhitespace(scanner), caseStatement(scanner), chainLineTry(alias(scanner))),
-      chainLine(skipWhitespace(scanner), matchOperator(scanner, '*'))
+      chainLine(field(scanner), chainLineTry(alias(scanner))),
+      chainLine(caseStatement(scanner), chainLineTry(alias(scanner))),
+      matchOperator(scanner, '*')
     );
 }
 
 // fieldList
 //       ::= field (, fieldList)?
 function fieldList(scanner: Scanner) {
-  return (): IChain =>
-    chainLine(
-      skipWhitespace(scanner),
-      field(scanner),
-      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), fieldList(scanner))
-    );
+  return (): IChain => chainLine(field(scanner), chainLineTry(matchOperator(scanner, ','), fieldList(scanner)));
 }
 
 // <TableList> ::= <TableName> ( , <TableList> )?
 function tableList(scanner: Scanner) {
-  return (): IChain =>
-    chainLine(
-      skipWhitespace(scanner),
-      tableName(scanner),
-      chainLineTry(skipWhitespace(scanner), matchOperator(scanner, ','), skipWhitespace(scanner), tableList(scanner))
-    );
+  return (): IChain => chainLine(tableName(scanner), chainLineTry(matchOperator(scanner, ','), tableList(scanner)));
 }
 
 // expression
@@ -109,38 +81,22 @@ function tableList(scanner: Scanner) {
 function expression(scanner: Scanner) {
   return (): IChain =>
     chainLine(
-      skipWhitespace(scanner),
       chainTree(
-        chainLine(notOperator(scanner), skipAtLeastWhitespace(scanner), expression(scanner)),
+        chainLine(notOperator(scanner), expression(scanner)),
         chainLine(
           notOperator(scanner),
-          skipWhitespace(scanner),
           matchOpenParen(scanner, '('),
-          skipWhitespace(scanner),
           expression(scanner),
-          skipWhitespace(scanner),
           matchCloseParen(scanner, ')')
         ),
-        chainLine(
-          predicate(scanner),
-          skipAtLeastWhitespace(scanner),
-          logicalOperator(scanner),
-          skipAtLeastWhitespace(scanner),
-          expression(scanner)
-        ),
+        chainLine(predicate(scanner), logicalOperator(scanner), expression(scanner)),
         chainLine(
           matchOpenParen(scanner, '('),
-          skipWhitespace(scanner),
           predicate(scanner),
-          skipWhitespace(scanner),
           matchCloseParen(scanner, ')'),
-          skipWhitespace(scanner),
           logicalOperator(scanner),
-          skipWhitespace(scanner),
           matchOpenParen(scanner, '('),
-          skipWhitespace(scanner),
           predicate(scanner),
-          skipWhitespace(scanner),
           matchCloseParen(scanner, ')')
         ),
         chainLine(
@@ -164,40 +120,25 @@ function expression(scanner: Scanner) {
 function predicate(scanner: Scanner) {
   return (): IChain =>
     chainLine(
-      skipWhitespace(scanner),
       chainTree(
         chainLine(
           field(scanner),
-          chainLineTry(skipAtLeastWhitespace(scanner), matchReserved(scanner, 'not')),
-          skipAtLeastWhitespace(scanner),
+          chainLineTry(matchReserved(scanner, 'not')),
           matchReserved(scanner, 'in'),
-          skipWhitespace(scanner),
           matchOpenParen(scanner, '('),
-          skipWhitespace(scanner),
           fieldList(scanner),
-          skipWhitespace(scanner),
           matchCloseParen(scanner, ')')
         ),
+        chainLine(field(scanner), comparisonOperator(scanner), field(scanner)),
         chainLine(
           field(scanner),
-          skipWhitespace(scanner),
-          comparisonOperator(scanner),
-          skipWhitespace(scanner),
-          field(scanner)
-        ),
-        chainLine(
-          field(scanner),
-          chainLineTry(skipAtLeastWhitespace(scanner), matchReserved(scanner, 'not')),
-          skipAtLeastWhitespace(scanner),
+          chainLineTry(matchReserved(scanner, 'not')),
           matchReserved(scanner, 'between'),
-          skipAtLeastWhitespace(scanner),
           predicate(scanner),
-          skipAtLeastWhitespace(scanner),
           matchReserved(scanner, 'and'),
-          skipAtLeastWhitespace(scanner),
           predicate(scanner)
         ),
-        chainLine(field(scanner), skipAtLeastWhitespace(scanner), matchReserved(scanner, 'like'), stringMatch(scanner)),
+        chainLine(field(scanner), matchReserved(scanner, 'like'), stringMatch(scanner)),
         field(scanner)
       )
     );
@@ -222,7 +163,7 @@ function field(scanner: Scanner) {
 
 // TableName ::= WordOrString [Alias]
 function tableName(scanner: Scanner) {
-  return () => chainLine(skipWhitespace(scanner), matchWordOrString(scanner), chainLineTry(alias(scanner)));
+  return () => chainLine(matchWordOrString(scanner), chainLineTry(alias(scanner)));
 }
 
 // Alias ::= AS Word
@@ -232,14 +173,10 @@ function alias(scanner: Scanner) {
   return () =>
     chainTree(
       chainLine(
-        skipWhitespace(scanner),
         matchReserved(scanner, 'as'),
-        chainTree(
-          chainLine(skipAtLeastWhitespace(scanner), matchWord(scanner)),
-          chainLine(skipWhitespace(scanner), matchString(scanner))
-        )
+        chainTree(chainLine(matchWord(scanner)), chainLine(matchString(scanner)))
       ),
-      chainLine(skipWhitespace(scanner), matchWordOrString(scanner))
+      chainLine(matchWordOrString(scanner))
     );
 }
 
@@ -248,15 +185,10 @@ function alias(scanner: Scanner) {
 function caseStatement(scanner: Scanner) {
   return () =>
     chainLine(
-      skipWhitespace(scanner),
       matchOpenParen(scanner, 'case'),
-      skipAtLeastWhitespace(scanner),
       matchPlus(scanner, caseAlternative(scanner)),
-      skipAtLeastWhitespace(scanner),
       matchReserved(scanner, 'else'),
-      skipAtLeastWhitespace(scanner),
       stringMatch(scanner),
-      skipAtLeastWhitespace(scanner),
       matchCloseParen(scanner, 'end')
     );
 }
@@ -266,25 +198,21 @@ function caseStatement(scanner: Scanner) {
 function caseAlternative(scanner: Scanner) {
   return () =>
     chainLine(
-      skipWhitespace(scanner),
       matchReserved(scanner, 'when'),
-      skipAtLeastWhitespace(scanner),
       expression(scanner),
-      skipAtLeastWhitespace(scanner),
       matchReserved(scanner, 'then'),
-      skipAtLeastWhitespace(scanner),
       stringMatch(scanner)
     );
 }
 
 // <Word> ::= Word
 function wordMatch(scanner: Scanner) {
-  return () => chainLine(skipWhitespace(scanner), matchWord(scanner));
+  return () => chainLine(matchWord(scanner));
 }
 
 // <String> ::= String
 function stringMatch(scanner: Scanner) {
-  return () => chainLine(skipWhitespace(scanner), matchString(scanner));
+  return () => chainLine(matchString(scanner));
 }
 
 function stringOrWordMatch(scanner: Scanner) {
@@ -293,26 +221,23 @@ function stringOrWordMatch(scanner: Scanner) {
 
 // <Number> ::= Number
 function numberMatch(scanner: Scanner) {
-  return () => chainLine(skipWhitespace(scanner), matchNumber(scanner));
+  return () => chainLine(matchNumber(scanner));
 }
 
 // <Function> ::= <Word>(<Number> | *)
 function functionMatch(scanner: Scanner) {
   return () =>
     chainLine(
-      skipWhitespace(scanner),
       wordMatch(scanner),
       matchOpenParen(scanner, '('),
-      skipWhitespace(scanner),
       chainTree(numberMatch(scanner), matchOperator(scanner, '*')),
-      skipWhitespace(scanner),
       matchCloseParen(scanner, ')')
     );
 }
 
 // <Constant> ::= Word | String | Integer
 function constant(scanner: Scanner) {
-  return () => chainLine(skipWhitespace(scanner), matchWordOrStringOrNumber(scanner));
+  return () => chainLine(matchWordOrStringOrNumber(scanner));
 }
 
 function logicalOperator(scanner: Scanner) {

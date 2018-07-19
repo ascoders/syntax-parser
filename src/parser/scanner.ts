@@ -1,11 +1,13 @@
 import { IToken } from '../lexer/interface';
+import tokenTypes from '../lexer/token-types';
 
 export class Scanner {
   private tokens: IToken[] = [];
   private index = 0;
 
   constructor(tokens: IToken[], index = 0) {
-    this.tokens = tokens;
+    // ignore whitespace
+    this.tokens = tokens.filter(token => token.type !== tokenTypes.WHITESPACE);
     this.index = index;
   }
 
