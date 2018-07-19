@@ -44,22 +44,6 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch) {
   };
 }
 
-export const matchReserved = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => isTypeReserved(token) && equalWordOrIncludeWords(token.value, word))
-);
-
-export const matchOperator = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => token.type === tokenTypes.OPERATOR && equalWordOrIncludeWords(token.value, word))
-);
-
-export const matchOpenParen = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => token.type === tokenTypes.OPEN_PAREN && equalWordOrIncludeWords(token.value, word))
-);
-
-export const matchCloseParen = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => token.type === tokenTypes.CLOSE_PAREN && equalWordOrIncludeWords(token.value, word))
-);
-
 export const matchWord = createMatch((scanner, word?: string | string[]) => {
   if (!word) {
     return matchToken(scanner, token => token.type === tokenTypes.WORD);
@@ -67,6 +51,10 @@ export const matchWord = createMatch((scanner, word?: string | string[]) => {
     return matchToken(scanner, token => token.type === tokenTypes.WORD && equalWordOrIncludeWords(token.value, word));
   }
 });
+
+export const match = createMatch((scanner, word: string | string[]) =>
+  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word))
+);
 
 export const matchString = createMatch(scanner => matchToken(scanner, token => token.type === tokenTypes.STRING));
 
