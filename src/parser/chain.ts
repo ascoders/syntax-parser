@@ -1,23 +1,34 @@
-import { IMatch, matchAll } from './match';
+import {
+  IMatch,
+  match,
+  matchFalse,
+  matchNumber,
+  matchString,
+  matchTrue,
+  matchWord,
+  matchWordOrString,
+  matchWordOrStringOrNumber
+} from './match';
 import { Scanner } from './scanner';
 
 type IMatchFn = () => IMatch;
 
-type Func = IMatchFn | IChain | (() => IChain);
+type Func = IMatchFn | IChainNodeFactory | (() => IChainNodeFactory);
 
 class ChainChild {
   // If type is function, when run it, will expend.
   public type: 'match' | 'chainNode' | 'function';
-  public node?: IMatchFn | ChainNode | FunctionNode;
+  public node?: IMatchFn | ChainNode | ChainFunctionNode;
 }
 
-export type IChain = (parentNode?: ChainNode) => ChainNode;
+export type IChainNodeFactory = (parentNode?: ChainNode) => ChainNode;
 
 export class ChainNode {
   public prev: ChainNode;
   public next: ChainNode;
   public childs: ChainChild[] = [];
   public isFinished = true;
+  public scanner: Scanner;
 
   private currentRunIndex = 0;
 
@@ -35,9 +46,9 @@ export class ChainNode {
     }
 
     if (childNode.type === 'function') {
-      const functionResult = (childNode.node as FunctionNode).exec();
+      const functionResult = (childNode.node as ChainFunctionNode).exec();
       // Rewrite current node.
-      this.childs[this.currentRunIndex] = createChainChildByFunction(this, functionResult);
+      this.childs[this.currentRunIndex] = createChainChildByElement(this, this.scanner, functionResult);
       // Rerun.
       return this.run();
     }
@@ -57,15 +68,19 @@ export class ChainNode {
   };
 }
 
-export class FunctionNode {
-  private func: () => IChain;
+export class ChainFunctionNode {
+  private chainFunction: IChain;
+  private scanner: Scanner;
+  private parentNode: ChainNode;
 
-  constructor(func: () => IChain) {
-    this.func = func;
+  constructor(func: IChain, scanner: Scanner, parentNode: ChainNode) {
+    this.chainFunction = func;
+    this.scanner = scanner;
+    this.parentNode = parentNode;
   }
 
   public exec = () => {
-    return this.func();
+    return this.chainFunction(createChainNodeFactory(this.scanner, this.parentNode));
   };
 }
 
@@ -78,102 +93,80 @@ const linkNode = (prevNode: ChainNode, nextNode: ChainNode) => {
   nextNode.prev = prevNode;
 };
 
-function createChainChildByFunction(parentChainNode: ChainNode, func: Func) {
+// export const chainLineTry = (...funs: Func[]) => {
+//   function foo(parentNode: ChainNode = null) {
+//     return chainTree(chainLine(...funs), matchAll())(parentNode);
+//   }
+//   foo.prototype.name = 'chainLineInner';
+//   return foo;
+// };
+
+export type IChain = (...elements: any[]) => ChainNode;
+
+function createChainChildByElement(parentNode: ChainNode, scanner: Scanner, element: any) {
   const chainChild = new ChainChild();
 
-  switch (func.prototype.name) {
-    case 'match':
+  if (typeof element === 'string') {
+    chainChild.type = 'match';
+    chainChild.node = match(element)(scanner);
+  } else if (typeof element === 'boolean') {
+    chainChild.type = 'match';
+    if (element) {
+      chainChild.node = matchTrue;
+    } else {
+      chainChild.node = matchFalse;
+    }
+  } else if (element instanceof ChainNode) {
+    chainChild.type = 'chainNode';
+    chainChild.node = element;
+  } else if (typeof element === 'function') {
+    if (element.prototype.name === 'match') {
+      element();
       chainChild.type = 'match';
-      chainChild.node = func as IMatchFn;
-      break;
-    case 'chainLineInner':
-    case 'chainTreeInner':
-    case 'chainTryInner':
-      const chainFunc = func as IChain;
-      const node = chainFunc();
-      node.prev = parentChainNode;
-
-      chainChild.type = 'chainNode';
-      chainChild.node = node;
-      break;
-    default:
+      chainChild.node = element(scanner);
+    } else {
       chainChild.type = 'function';
       // To prevent stack overflow, don't run common function immediately.
-      const functionNode = new FunctionNode(func as (() => IChain));
+      const functionNode = new ChainFunctionNode(element as IChain, scanner, parentNode);
       chainChild.node = functionNode;
+    }
+  } else {
+    throw Error(`unknow element in chain ${element}`);
   }
 
   return chainChild;
 }
 
-export const chainLine = (...funs: Func[]): IChain => {
-  function foo(parentNode: ChainNode = null) {
-    let firstNode: ChainNode = null;
-    let lastNode: ChainNode = null;
+export const createChainNodeFactory = (scanner: Scanner, parentNode?: ChainNode) => (...elements: any[]): ChainNode => {
+  let firstNode: ChainNode = null;
 
-    funs.forEach(func => {
-      if (!func) {
-        return;
-      }
+  elements.reduce((prevNode: ChainNode, element) => {
+    const node = new ChainNode();
+    node.scanner = scanner;
 
-      const currentNode = new ChainNode();
-      currentNode.addChild(createChainChildByFunction(currentNode, func));
-      linkNode(lastNode, currentNode);
-
-      lastNode = currentNode;
-
-      if (!firstNode) {
-        firstNode = currentNode;
-      }
-    });
-
-    if (parentNode) {
-      linkNode(parentNode, firstNode);
+    if (!firstNode) {
+      firstNode = node;
     }
 
-    return firstNode;
-  }
-  foo.prototype.name = 'chainLineInner';
-  return foo;
-};
+    // Set first、lastNode, and link it
+    if (prevNode === parentNode) {
+      node.prev = prevNode;
+    } else {
+      linkNode(prevNode, node);
+    }
 
-export const chainTree = (...funs: Func[]): IChain => {
-  function foo(parentNode: ChainNode = null) {
-    const node = new ChainNode();
-
-    funs.forEach(func => {
-      if (!func) {
-        return;
-      }
-
-      const chainChild = createChainChildByFunction(node, func);
-      node.addChild(chainChild);
-    });
-
-    if (parentNode) {
-      linkNode(parentNode, node);
+    if (element instanceof Array) {
+      element.forEach(eachElement => {
+        node.addChild(createChainChildByElement(node, scanner, eachElement));
+      });
+    } else {
+      node.addChild(createChainChildByElement(node, scanner, element));
     }
 
     return node;
-  }
-  foo.prototype.name = 'chainLineInner';
-  return foo;
-};
+  }, parentNode);
 
-export const chainLineTry = (...funs: Func[]) => {
-  function foo(parentNode: ChainNode = null) {
-    return chainTree(chainLine(...funs), matchAll())(parentNode);
-  }
-  foo.prototype.name = 'chainLineInner';
-  return foo;
-};
-
-export const chainTreeTry = (...funs: Func[]): any => {
-  function foo(parentNode: ChainNode = null) {
-    return chainTree(chainTree(...funs), matchAll())(parentNode);
-  }
-  foo.prototype.name = 'chainTreeInner';
-  return foo;
+  return firstNode;
 };
 
 interface ITreeChance {

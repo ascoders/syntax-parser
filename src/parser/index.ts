@@ -1,71 +1,38 @@
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
-import { chainLine, chainLineTry, chainTree, chainTreeTry, execChain, IChain } from './chain';
-import {
-  match,
-  matchNumber,
-  matchPlus,
-  matchString,
-  matchWord,
-  matchWordOrString,
-  matchWordOrStringOrNumber
-} from './match';
+import { createChainNodeFactory, execChain, IChain, IChainNodeFactory } from './chain';
+import { match, matchNumber, matchString, matchWord, optional, plus } from './match';
 import { Scanner } from './scanner';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
-// <Statement> ::= <SelectStatement>
-function statement(scanner: Scanner) {
-  return chainTree(selectStatement(scanner));
-}
+// chain zeroOrMore oneOrMore zeroOrOne
 
-// <SelectStatement> ::= SELECT [SelectList] FROM <TableList> WhereStatement?
-function selectStatement(scanner: Scanner) {
-  return () =>
-    chainLine(
-      match(scanner, 'select'),
-      selectList(scanner),
-      match(scanner, 'from'),
-      tableList(scanner),
-      chainLineTry(whereStatement(scanner))
-    );
-}
+const statement = (chain: IChain) => chain([selectStatement]);
 
-// <SelectList> ::= <SelectField> ( , <SelectList> )?
-function selectList(scanner: Scanner) {
-  return (): IChain => chainLine(selectField(scanner), chainLineTry(match(scanner, ','), selectList(scanner)));
-}
+const selectStatement = (chain: IChain) => chain('select', selectList, 'from', tableList, optional(whereStatement));
+
+// selectList ::= selectField ( , selectList )?
+const selectList = (chain: IChain) => chain(selectField, optional(',', selectList));
 
 // whereStatement ::= WHERE expression
-function whereStatement(scanner: Scanner) {
-  return () => chainLine(match(scanner, 'where'), expression(scanner));
-}
+const whereStatement = (chain: IChain) => chain('where', expression);
 
 // selectField
 //         ::= field alias?
 //           | caseStatement alias?
 //           | *
-function selectField(scanner: Scanner) {
-  return () =>
-    chainTree(
-      chainLine(field(scanner), chainLineTry(alias(scanner))),
-      chainLine(caseStatement(scanner), chainLineTry(alias(scanner))),
-      match(scanner, '*')
-    );
-}
+const selectField = (chain: IChain) =>
+  chain([chain(field, optional(alias)), chain(caseStatement, optional(alias)), '*']);
 
 // fieldList
 //       ::= field (, fieldList)?
-function fieldList(scanner: Scanner) {
-  return (): IChain => chainLine(field(scanner), chainLineTry(match(scanner, ','), fieldList(scanner)));
-}
+const fieldList = (chain: IChain) => chain(field, optional(',', fieldList));
 
-// <TableList> ::= <TableName> ( , <TableList> )?
-function tableList(scanner: Scanner) {
-  return (): IChain => chainLine(tableName(scanner), chainLineTry(match(scanner, ','), tableList(scanner)));
-}
+// tableList ::= tableName ( , tableList )?
+const tableList = (chain: IChain) => chain(tableName, optional(',', tableList));
 
 // expression
 //        ::= notOperator expression
@@ -74,30 +41,15 @@ function tableList(scanner: Scanner) {
 //          | '(' expression ')' logicalOperator '(' expression ')'
 //          | predicate IS NOT? (TRUE | FALSE | UNKNOWN)
 //          | predicate
-function expression(scanner: Scanner) {
-  return (): IChain =>
-    chainTree(
-      chainLine(notOperator(scanner), expression(scanner)),
-      chainLine(notOperator(scanner), match(scanner, '('), expression(scanner), match(scanner, ')')),
-      chainLine(predicate(scanner), logicalOperator(scanner), expression(scanner)),
-      chainLine(
-        match(scanner, '('),
-        predicate(scanner),
-        match(scanner, ')'),
-        logicalOperator(scanner),
-        match(scanner, '('),
-        predicate(scanner),
-        match(scanner, ')')
-      ),
-      chainLine(
-        predicate(scanner),
-        match(scanner, 'is'),
-        chainLineTry(match(scanner, 'not')),
-        chainTree(match(scanner, 'true'), match(scanner, 'false'), match(scanner, 'unknown'))
-      ),
-      predicate(scanner)
-    );
-}
+const expression = (chain: IChain) =>
+  chain([
+    chain(notOperator, expression),
+    chain(notOperator, '(', expression, ')'),
+    chain(predicate, logicalOperator, expression),
+    chain('(', expression, ')', logicalOperator, '(', expression, ')'),
+    chain(predicate, 'is', optional('not'), ['true', 'fasle', 'unknown']),
+    predicate
+  ]);
 
 // predicate
 //       ::= predicate NOT? IN '(' fieldList ')'
@@ -106,30 +58,14 @@ function expression(scanner: Scanner) {
 //         | predicate SOUNDS LIKE predicate
 //         | predicate NOT? LIKE predicate (ESCAPE STRING_LITERAL)?
 //         | field
-function predicate(scanner: Scanner) {
-  return (): IChain =>
-    chainTree(
-      chainLine(
-        field(scanner),
-        chainLineTry(match(scanner, 'not')),
-        match(scanner, 'in'),
-        match(scanner, '('),
-        fieldList(scanner),
-        match(scanner, ')')
-      ),
-      chainLine(field(scanner), comparisonOperator(scanner), field(scanner)),
-      chainLine(
-        field(scanner),
-        chainLineTry(match(scanner, 'not')),
-        match(scanner, 'between'),
-        predicate(scanner),
-        match(scanner, 'and'),
-        predicate(scanner)
-      ),
-      chainLine(field(scanner), match(scanner, 'like'), stringMatch(scanner)),
-      field(scanner)
-    );
-}
+const predicate = (chain: IChain) =>
+  chain([
+    chain(fieldList, optional('not'), 'in', '(', fieldList, ')'),
+    chain(fieldList, comparisonOperator, field),
+    chain(fieldList, optional('not'), 'between', predicate, 'and', predicate),
+    chain(fieldList, 'like', stringChain),
+    field
+  ]);
 
 // field
 //   ::= <function>
@@ -137,98 +73,46 @@ function predicate(scanner: Scanner) {
 //     | <stringOrWord>.*
 //     | <stringOrWord>.<stringOrWord>
 //     | <stringOrWord>
-function field(scanner: Scanner) {
-  return () =>
-    chainTree(
-      functionMatch(scanner),
-      numberMatch(scanner),
-      chainLine(stringOrWordMatch(scanner), match(scanner, '.'), match(scanner, '*')),
-      chainLine(stringOrWordMatch(scanner), match(scanner, '.'), stringOrWordMatch(scanner)),
-      stringOrWordMatch(scanner)
-    );
-}
+const field = (chain: IChain) =>
+  chain([
+    functionChain,
+    numberChain,
+    chain(stringOrWord, '.', '*'),
+    chain(stringOrWord, '.', stringOrWord),
+    stringOrWord
+  ]);
 
-// TableName ::= WordOrString [Alias]
-function tableName(scanner: Scanner) {
-  return () => chainLine(matchWordOrString(scanner), chainLineTry(alias(scanner)));
-}
+// tableName ::= wordOrString alias?
+const tableName = (chain: IChain) => chain(stringOrWord, optional(alias));
 
-// Alias ::= AS Word
-//         | AS'String
+// Alias ::= AS WordOrString
 //         | WordOrString
-function alias(scanner: Scanner) {
-  return () =>
-    chainTree(
-      chainLine(match(scanner, 'as'), chainTree(chainLine(matchWord(scanner)), chainLine(matchString(scanner)))),
-      chainLine(matchWordOrString(scanner))
-    );
-}
+const alias = (chain: IChain) => chain([chain('as', stringOrWord), stringOrWord]);
 
 // caseStatement
 //           ::= CASE caseAlternative+ ELSE string END
-function caseStatement(scanner: Scanner) {
-  return () =>
-    chainLine(
-      match(scanner, 'case'),
-      matchPlus(scanner, caseAlternative(scanner)),
-      match(scanner, 'else'),
-      stringMatch(scanner),
-      match(scanner, 'end')
-    );
-}
+const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'else', stringChain, 'end');
 
 // caseAlternative
 //             ::= WHEN expression THEN string
-function caseAlternative(scanner: Scanner) {
-  return () => chainLine(match(scanner, 'when'), expression(scanner), match(scanner, 'then'), stringMatch(scanner));
-}
+const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringChain);
 
-// <Word> ::= Word
-function wordMatch(scanner: Scanner) {
-  return () => chainLine(matchWord(scanner));
-}
+const wordChain = (chain: IChain) => chain(matchWord());
 
-// <String> ::= String
-function stringMatch(scanner: Scanner) {
-  return () => chainLine(matchString(scanner));
-}
+const stringChain = (chain: IChain) => chain(matchString());
 
-function stringOrWordMatch(scanner: Scanner) {
-  return () => chainTree(wordMatch(scanner), stringMatch(scanner));
-}
+const numberChain = (chain: IChain) => chain(matchNumber());
 
-// <Number> ::= Number
-function numberMatch(scanner: Scanner) {
-  return () => chainLine(matchNumber(scanner));
-}
+const stringOrWord = (chain: IChain) => chain([wordChain, stringChain]);
 
-// <Function> ::= <Word>(<Number> | *)
-function functionMatch(scanner: Scanner) {
-  return () =>
-    chainLine(
-      wordMatch(scanner),
-      match(scanner, '('),
-      chainTree(numberMatch(scanner), match(scanner, '*')),
-      match(scanner, ')')
-    );
-}
+// function ::= word '(' number | * ')'
+const functionChain = (chain: IChain) => chain(wordChain, '(', [numberChain, '*'], ')');
 
-// <Constant> ::= Word | String | Integer
-function constant(scanner: Scanner) {
-  return () => chainLine(matchWordOrStringOrNumber(scanner));
-}
+const logicalOperator = (chain: IChain) => chain(match(['and', '&&', 'xor', 'or', '||']));
 
-function logicalOperator(scanner: Scanner) {
-  return () => chainLine(match(scanner, ['and', '&&', 'xor', 'or', '||']));
-}
+const comparisonOperator = (chain: IChain) => chain(match(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>']));
 
-function comparisonOperator(scanner: Scanner) {
-  return () => chainLine(match(scanner, ['=', '>', '<', '<=', '>=', '<>', '!=', '<=>']));
-}
-
-function notOperator(scanner: Scanner) {
-  return match(scanner, ['not', '!']);
-}
+const notOperator = (chain: IChain) => chain(match(['not', '!']));
 
 export class AstParser {
   private scanner: Scanner;
@@ -238,7 +122,8 @@ export class AstParser {
   }
 
   public parse = () => {
-    const node = statement(this.scanner)();
-    return execChain(node, this.scanner);
+    const chainNodeFactory = createChainNodeFactory(this.scanner);
+    const chainNode = chainNodeFactory(statement);
+    return execChain(chainNode, this.scanner);
   };
 }

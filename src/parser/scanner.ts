@@ -6,8 +6,14 @@ export class Scanner {
   private index = 0;
 
   constructor(tokens: IToken[], index = 0) {
-    // ignore whitespace
-    this.tokens = tokens.filter(token => token.type !== tokenTypes.WHITESPACE);
+    // ignore whitespace, comment
+    this.tokens = tokens.filter(
+      token =>
+        token.type !== tokenTypes.WHITESPACE &&
+        token.type !== tokenTypes.COMMENT &&
+        token.type !== tokenTypes.LINE_COMMENT &&
+        token.type !== tokenTypes.BLOCK_COMMENT
+    );
     this.index = index;
   }
 

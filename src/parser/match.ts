@@ -1,6 +1,6 @@
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
-import { chainLine, chainLineTry, IChain } from './chain';
+import { IChain, IChainNodeFactory } from './chain';
 import { Scanner } from './scanner';
 
 export type IMatch = boolean;
@@ -11,14 +11,6 @@ function equalWordOrIncludeWords(str: string, word: string | string[]) {
   } else {
     return word.some(eachWord => eachWord.toLowerCase() === str.toLowerCase());
   }
-}
-
-function isTypeReserved(token: IToken) {
-  return (
-    token.type === tokenTypes.RESERVED ||
-    token.type === tokenTypes.RESERVED_NEWLINE ||
-    token.type === tokenTypes.RESERVED_TOPLEVEL
-  );
 }
 
 function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMatch {
@@ -35,9 +27,9 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMat
 }
 
 function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch) {
-  return (scanner: Scanner, arg?: T) => {
-    function foo() {
-      return fn(scanner, arg);
+  return (arg?: T) => {
+    function foo(scanner: Scanner) {
+      return () => fn(scanner, arg);
     }
     foo.prototype.name = 'match';
     return foo;
@@ -71,14 +63,9 @@ export const matchWordOrStringOrNumber = createMatch(scanner =>
   )
 );
 
-export const matchAll = () => {
-  function foo() {
-    return true;
-  }
-  foo.prototype.name = 'match';
-  return foo;
-};
+export const matchTrue = () => true;
+export const matchFalse = () => false;
 
-export const matchPlus = (scanner: Scanner, fn: () => IChain) => {
-  return (): IChain => chainLine(fn, chainLineTry(matchPlus(scanner, fn)));
-};
+export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements), true]);
+
+export const plus = (...elements: any[]) => (chain: IChain) => chain(chain(...elements), optional(plus(...elements)));
