@@ -8,7 +8,7 @@ const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
-// chain zeroOrMore oneOrMore zeroOrOne
+const root = (chain: IChain) => chain(statement, optional(plus(';', statement)));
 
 const statement = (chain: IChain) => chain([selectStatement]);
 
@@ -123,7 +123,7 @@ export class AstParser {
 
   public parse = () => {
     const chainNodeFactory = createChainNodeFactory(this.scanner);
-    const chainNode = chainNodeFactory(statement);
+    const chainNode = chainNodeFactory(root);
     return execChain(chainNode, this.scanner);
   };
 }

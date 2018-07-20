@@ -11,11 +11,12 @@
     "test": "pri test",
     "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'",
     "antlr4": "antlr4 -Dlanguage=JavaScript src/SqlLexer.g4",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "bundle": "pri bundle"
   },
   "dependencies": {
     "antlr4": "^4.7.1",
-    "pri": "^0.9.18",
+    "pri": "^0.10.3",
     "@babel/runtime": "^7.0.0-beta.51"
   },
   "main": "dist/src/index.js",
