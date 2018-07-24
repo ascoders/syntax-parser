@@ -14,6 +14,8 @@ const statement = (chain: IChain) => chain([selectStatement]);
 
 const selectStatement = (chain: IChain) => chain('select', selectList, 'from', tableList, optional(whereStatement));
 
+const notStatement = (chain: IChain) => chain('not', optional(notStatement))
+
 // selectList ::= selectField ( , selectList )?
 const selectList = (chain: IChain) => chain(selectField, optional(',', selectList));
 
@@ -21,11 +23,18 @@ const selectList = (chain: IChain) => chain(selectField, optional(',', selectLis
 const whereStatement = (chain: IChain) => chain('where', expression);
 
 // selectField
-//         ::= field alias?
+//         ::= not? field alias?
 //           | caseStatement alias?
 //           | *
 const selectField = (chain: IChain) =>
-  chain([chain(field, optional(alias)), chain(caseStatement, optional(alias)), '*']);
+  chain([
+    chain([
+      chain(optional(notStatement), field),
+      chain(optional(notStatement), '(', field, ')')
+    ], optional(alias)),
+    chain(caseStatement, optional(alias)),
+    '*'
+  ]);
 
 // fieldList
 //       ::= field (, fieldList)?
