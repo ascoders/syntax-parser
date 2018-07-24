@@ -40,7 +40,9 @@ sqlTests.forEach(sqlTest => {
       const result = new AstParser(tokens).parse();
 
       if (!result) {
+        // tslint:disable-next-line:no-console
         console.log('tokens');
+        // tslint:disable-next-line:no-console
         console.log(tokens);
       }
 

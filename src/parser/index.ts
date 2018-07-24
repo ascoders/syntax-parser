@@ -1,6 +1,5 @@
 import { IToken } from '../lexer/interface';
-import tokenTypes from '../lexer/token-types';
-import { createChainNodeFactory, execChain, IChain, IChainNodeFactory } from './chain';
+import { createChainNodeFactory, execChain, IChain } from './chain';
 import { match, matchNumber, matchString, matchWord, optional, plus } from './match';
 import { Scanner } from './scanner';
 

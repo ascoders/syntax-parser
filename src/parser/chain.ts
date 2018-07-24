@@ -2,26 +2,17 @@ import {
   IMatch,
   match,
   matchFalse,
-  matchNumber,
-  matchString,
   matchTrue,
-  matchWord,
-  matchWordOrString,
-  matchWordOrStringOrNumber
 } from './match';
 import { Scanner } from './scanner';
 
 type IMatchFn = () => IMatch;
-
-type Func = IMatchFn | IChainNodeFactory | (() => IChainNodeFactory);
 
 class ChainChild {
   // If type is function, when run it, will expend.
   public type: 'match' | 'chainNode' | 'function';
   public node?: IMatchFn | ChainNode | ChainFunctionNode;
 }
-
-export type IChainNodeFactory = (parentNode?: ChainNode) => ChainNode;
 
 export class ChainNode {
   public prev: ChainNode;

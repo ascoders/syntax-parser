@@ -1,6 +1,6 @@
 import { IToken } from '../lexer/interface';
 import tokenTypes from '../lexer/token-types';
-import { IChain, IChainNodeFactory } from './chain';
+import { IChain } from './chain';
 import { Scanner } from './scanner';
 
 export type IMatch = boolean;
