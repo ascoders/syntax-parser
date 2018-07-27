@@ -13,7 +13,7 @@ const statement = (chain: IChain) => chain([selectStatement]);
 
 const selectStatement = (chain: IChain) => chain('select', selectList, 'from', tableList, optional(whereStatement));
 
-const notStatement = (chain: IChain) => chain('not', optional(notStatement))
+const notStatement = (chain: IChain) => chain('not', optional(notStatement));
 
 // selectList ::= selectField ( , selectList )?
 const selectList = (chain: IChain) => chain(selectField, optional(',', selectList));
@@ -27,10 +27,7 @@ const whereStatement = (chain: IChain) => chain('where', expression);
 //           | *
 const selectField = (chain: IChain) =>
   chain([
-    chain([
-      chain(optional(notStatement), field),
-      chain(optional(notStatement), '(', field, ')')
-    ], optional(alias)),
+    chain([chain(optional(notStatement), field), chain(optional(notStatement), '(', field, ')')], optional(alias)),
     chain(caseStatement, optional(alias)),
     '*'
   ]);
@@ -48,15 +45,14 @@ const tableList = (chain: IChain) => chain(tableName, optional(',', tableList));
 //          | predicate logicalOperator expression
 //          | '(' expression ')' logicalOperator '(' expression ')'
 //          | predicate IS NOT? (TRUE | FALSE | UNKNOWN)
-//          | predicate
+//          | ( expression )
 const expression = (chain: IChain) =>
   chain([
     chain(notOperator, expression),
     chain(notOperator, '(', expression, ')'),
-    chain(predicate, logicalOperator, expression),
-    chain('(', expression, ')', logicalOperator, '(', expression, ')'),
+    chain(predicate, optional(plus(logicalOperator, expression))),
     chain(predicate, 'is', optional('not'), ['true', 'fasle', 'unknown']),
-    predicate
+    chain('(', expression, ')')
   ]);
 
 // predicate
@@ -66,13 +62,15 @@ const expression = (chain: IChain) =>
 //         | predicate SOUNDS LIKE predicate
 //         | predicate NOT? LIKE predicate (ESCAPE STRING_LITERAL)?
 //         | field
+//         | ( predicate )
 const predicate = (chain: IChain) =>
   chain([
     chain(fieldList, optional('not'), 'in', '(', fieldList, ')'),
     chain(fieldList, comparisonOperator, field),
     chain(fieldList, optional('not'), 'between', predicate, 'and', predicate),
     chain(fieldList, 'like', stringChain),
-    field
+    field,
+    chain('(', predicate, ')')
   ]);
 
 // field

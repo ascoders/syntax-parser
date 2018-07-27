@@ -5,34 +5,33 @@ class Props {}
 
 class State {}
 
-// function parse(str: string) {
-//   const startTime = new Date();
-//   const tokenizer = new Tokenizer(tokenConfig);
-//   const tokens = tokenizer.tokenize(str);
-//   const endTime1 = new Date();
-//   const result = new AstParser(tokens).parse();
-//   const endTime2 = new Date();
+function parse(str: string) {
+  const startTime = new Date();
+  const tokenizer = new Tokenizer(tokenConfig);
+  const tokens = tokenizer.tokenize(str);
+  const endTime1 = new Date();
+  const result = new AstParser(tokens).parse();
+  const endTime2 = new Date();
 
-//   console.log('lexer time', endTime1.getTime() - startTime.getTime(), 'ms');
-//   console.log('parser time', endTime2.getTime() - endTime1.getTime(), 'ms');
-//   console.log('result', result);
+  // tslint:disable-next-line:no-console
+  console.log('lexer time', endTime1.getTime() - startTime.getTime(), 'ms');
+  // tslint:disable-next-line:no-console
+  console.log('parser time', endTime2.getTime() - endTime1.getTime(), 'ms');
+  // tslint:disable-next-line:no-console
+  console.log('result', result);
 
-//   if (!result) {
-//     console.log('tokens', tokens);
-//   }
-// }
+  if (!result) {
+    // tslint:disable-next-line:no-console
+    console.log('tokens', tokens);
+  }
+}
 
-// parse(
-//   Array.from(Array(1000))
-//     .map(
-//       () => `
-// select intersects inid, innot notin
-// from fromson nots
-// where colorwhere IN (nots.pon)
-// `
-//     )
-//     .join(';')
-// );
+parse(
+  `SELECT *
+FROM hats
+WHERE
+  (1 != 2) OR 3 != 4 AND 3 = 3`
+);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();
