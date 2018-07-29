@@ -129,7 +129,7 @@ export class AstParser {
 
   public parse = () => {
     const chainNodeFactory = createChainNodeFactory(this.scanner);
-    const chainNode = chainNodeFactory(root);
-    return execChain(chainNode, this.scanner);
+    const firstNode = chainNodeFactory(root);
+    return execChain(firstNode, this.scanner);
   };
 }

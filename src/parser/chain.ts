@@ -84,14 +84,6 @@ const linkNode = (prevNode: ChainNode, nextNode: ChainNode) => {
   nextNode.prev = prevNode;
 };
 
-// export const chainLineTry = (...funs: Func[]) => {
-//   function foo(parentNode: ChainNode = null) {
-//     return chainTree(chainLine(...funs), matchAll())(parentNode);
-//   }
-//   foo.prototype.name = 'chainLineInner';
-//   return foo;
-// };
-
 export type IChain = (...elements: any[]) => ChainNode;
 
 function createChainChildByElement(parentNode: ChainNode, scanner: Scanner, element: any) {

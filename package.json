@@ -15,7 +15,7 @@
     "bundle": "pri bundle"
   },
   "devDependencies": {
-    "pri": "^0.10.8",
+    "pri": "^0.10.8"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
