@@ -69,3 +69,5 @@ export const matchFalse = () => false;
 export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements), true]);
 
 export const plus = (...elements: any[]) => (chain: IChain) => chain(chain(...elements), optional(plus(...elements)));
+
+export const many = (...elements: any[]) => (chain: IChain) => optional(plus(...elements));

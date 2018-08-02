@@ -1,9 +1,4 @@
-import {
-  IMatch,
-  match,
-  matchFalse,
-  matchTrue,
-} from './match';
+import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 
 type IMatchFn = () => IMatch;
@@ -71,7 +66,7 @@ export class ChainFunctionNode {
   }
 
   public exec = () => {
-    return this.chainFunction(createChainNodeFactory(this.scanner, this.parentNode));
+    return this.chainFunction(createChainNodeFactory(this.scanner, this.parentNode, this.chainFunction.name));
   };
 }
 
@@ -120,8 +115,15 @@ function createChainChildByElement(parentNode: ChainNode, scanner: Scanner, elem
   return chainChild;
 }
 
-export const createChainNodeFactory = (scanner: Scanner, parentNode?: ChainNode) => (...elements: any[]): ChainNode => {
+export const createChainNodeFactory = (
+  scanner: Scanner,
+  parentNode?: ChainNode,
+  // If parent node is a function, here will get it's name.
+  functionName?: string
+) => (...elements: any[]): ChainNode => {
   let firstNode: ChainNode = null;
+
+  elements = solveDirectLeftRecursion(elements, functionName);
 
   elements.reduce((prevNode: ChainNode, element) => {
     const node = new ChainNode();
@@ -151,6 +153,25 @@ export const createChainNodeFactory = (scanner: Scanner, parentNode?: ChainNode)
 
   return firstNode;
 };
+
+/**
+ * Solve direct left recursion.
+ * a -> a + b
+ *    | a + c
+ *    | d
+ *    | e
+ * ===
+ * a -> (d | e) ((+ b) | (+ c))*
+ */
+function solveDirectLeftRecursion(elements: any[], parentFunctionName: string) {
+  const leftRecursionElements = elements.filter(element => element.name === parentFunctionName);
+  const normalElements = elements.filter(element => element.name !== parentFunctionName);
+
+  // TODO:
+  // console.log(leftRecursionElements, normalElements);
+
+  return elements;
+}
 
 interface ITreeChance {
   chainNode: ChainNode;

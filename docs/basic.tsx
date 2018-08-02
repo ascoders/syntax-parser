@@ -26,12 +26,7 @@ function parse(str: string) {
   }
 }
 
-parse(
-  `SELECT *
-FROM hats
-WHERE
-  (1 != 2) OR 3 != 4 AND 3 = 3`
-);
+parse(`a b`);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();
