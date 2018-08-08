@@ -3,7 +3,10 @@ import tokenTypes from '../lexer/token-types';
 import { IChain } from './chain';
 import { Scanner } from './scanner';
 
-export type IMatch = boolean;
+export interface IMatch {
+  token: IToken;
+  match: boolean;
+}
 
 function equalWordOrIncludeWords(str: string, word: string | string[]) {
   if (typeof word === 'string') {
@@ -16,13 +19,22 @@ function equalWordOrIncludeWords(str: string, word: string | string[]) {
 function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMatch {
   const token = scanner.read();
   if (!token) {
-    return false;
+    return {
+      token: null,
+      match: false
+    };
   }
   if (compare(token)) {
     scanner.next();
-    return true;
+    return {
+      token,
+      match: true
+    };
   } else {
-    return false;
+    return {
+      token,
+      match: false
+    };
   }
 }
 
@@ -63,14 +75,20 @@ export const matchWordOrStringOrNumber = createMatch(scanner =>
   )
 );
 
-export const matchTrue = () => true;
-export const matchFalse = () => false;
+export const matchTrue = (): IMatch => ({
+  token: null,
+  match: true
+});
+export const matchFalse = (): IMatch => ({
+  token: null,
+  match: true
+});
 
 // TODO: 如何处理 ast 结果？
 
-export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])();
+export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])(ast => ast[0]);
 
 export const plus = (...elements: any[]) => (chain: IChain) =>
-  chain(chain(...elements)(), optional(plus(...elements)))();
+  chain(chain(...elements)(), optional(plus(...elements)))(ast => ast[0]);
 
-export const many = (...elements: any[]) => (chain: IChain) => chain(optional(plus(...elements)))();
+export const many = (...elements: any[]) => (chain: IChain) => chain(optional(plus(...elements)))(ast => ast[0]);

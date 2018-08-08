@@ -7,13 +7,21 @@ const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
-const root = (chain: IChain) => chain(statements, optional(';'))();
+const root = (chain: IChain) => chain(statements, optional(';'))(ast => ast[0]);
 
 const statements = (chain: IChain) => chain(statement, optional(';', statements))();
 
-const statement = (chain: IChain) => chain([selectStatement])();
+const statement = (chain: IChain) => chain([selectStatement])(ast => ast[0]);
 
-const selectStatement = (chain: IChain) => chain('select', selectList, 'from', tableList, optional(whereStatement))();
+const selectStatement = (chain: IChain) =>
+  chain('select', selectList, 'from', tableList, optional(whereStatement))(ast => {
+    return {
+      type: 'selectStatement',
+      fields: ast[1],
+      from: ast[3],
+      where: ast[4]
+    };
+  });
 
 const notStatement = (chain: IChain) => chain('not', optional(notStatement))();
 

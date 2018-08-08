@@ -12,7 +12,7 @@ type ParentNode = TreeNode | ChainNode;
 class MatchNode {
   public parentNode: ParentNode;
 
-  constructor(private matchFunction: IMatchFn, public originStr: string) {}
+  constructor(private matchFunction: IMatchFn) {}
 
   public run = () => this.matchFunction();
 }
@@ -30,7 +30,6 @@ export class FunctionNode {
 class TreeNode {
   public parentNode: ParentNode;
   public childs: Node[] = [];
-  public astResult?: IAstStatement = null;
   // Current running child index.
   public headIndex = 0;
 
@@ -47,6 +46,8 @@ export class ChainNode {
   // Eg: const foo = chain => chain()(), so the chain functionName is 'foo'.
   public functionName: string = null;
 
+  public solveAst: ISolveAst = null;
+
   // When try new tree chance, set tree node and it's parent chain node a new version, so all child visiter will reset headIndex if version if different.
   public version: number = 0;
 }
@@ -54,7 +55,7 @@ export class ChainNode {
 type SingleElement = string | any;
 type IElement = SingleElement | SingleElement[];
 type IElements = IElement[];
-type ISolveAst = (...astResult: IAstStatement[]) => IAstStatement;
+type ISolveAst = (astResult: IAstStatement[]) => IAstStatement;
 export type IChain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNode;
 type FunctionElement = (chain: IChain) => ChainNode;
 
@@ -70,16 +71,16 @@ const createNodeByElement = (
     treeNode.childs = element.map(eachElement => createNodeByElement(eachElement, scanner, treeNode, functionName));
     return treeNode;
   } else if (typeof element === 'string') {
-    const matchNode = new MatchNode(match(element)(scanner), element);
+    const matchNode = new MatchNode(match(element)(scanner));
     matchNode.parentNode = parentNode;
     return matchNode;
   } else if (typeof element === 'boolean') {
     if (element) {
-      const trueMatchNode = new MatchNode(matchTrue, 'true');
+      const trueMatchNode = new MatchNode(matchTrue);
       trueMatchNode.parentNode = parentNode;
       return trueMatchNode;
     } else {
-      const falseMatchNode = new MatchNode(matchFalse, 'false');
+      const falseMatchNode = new MatchNode(matchFalse);
       falseMatchNode.parentNode = parentNode;
       return falseMatchNode;
     }
@@ -89,7 +90,7 @@ const createNodeByElement = (
     return element;
   } else if (typeof element === 'function') {
     if (element.prototype.name === 'match') {
-      const matchNode = new MatchNode(element(scanner), 'null');
+      const matchNode = new MatchNode(element(scanner));
       matchNode.parentNode = parentNode;
       return matchNode;
     } else {
@@ -107,17 +108,15 @@ export const createChainNodeFactory = (
   parentNode?: ParentNode,
   // If parent node is a function, here will get it's name.
   functionName?: string
-) => (...elements: IElements) => (solveAst: ISolveAst = (...args) => args): ChainNode => {
+) => (...elements: IElements) => (solveAst: ISolveAst = args => args): ChainNode => {
   const chainNode = new ChainNode();
   chainNode.parentNode = parentNode;
   chainNode.functionName = functionName;
+  chainNode.solveAst = solveAst;
 
   elements = solveDirectLeftRecursion(elements, functionName);
 
-  chainNode.childs = elements.map(element => {
-    chainNode.astResults.push(null);
-    return createNodeByElement(element, scanner, chainNode, functionName);
-  });
+  chainNode.childs = elements.map(element => createNodeByElement(element, scanner, chainNode, functionName));
 
   return chainNode;
 };
@@ -180,35 +179,26 @@ function visiter(node: Node, scanner: Scanner, store: VisiterStore): boolean {
   const currentTokenIndex = scanner.getIndex();
 
   if (node instanceof ChainNode) {
-    if (node.version !== store.callTreeChanceCount) {
-      // If version not equal, reset headIndex
-      node.version = store.callTreeChanceCount;
-      node.headIndex = 0;
-    }
+    resetHeadByVersion(node, store);
 
     const nextChild = node.childs[node.headIndex];
-
     if (nextChild) {
       node.headIndex++;
       visiter(nextChild, scanner, store);
     } else {
-      callParentNode(node, scanner, store, node.astResults);
+      callParentNode(node, scanner, store, node.solveAst(node.astResults));
     }
   } else if (node instanceof MatchNode) {
-    if (!node.run()) {
+    const matchResult = node.run();
+    if (!matchResult.match) {
       tryChances(scanner, store);
     } else {
-      callParentNode(node, scanner, store, 'some text');
+      callParentNode(node, scanner, store, matchResult.token);
     }
   } else if (node instanceof TreeNode) {
-    if (node.version !== store.callTreeChanceCount) {
-      // If version not equal, reset headIndex
-      node.version = store.callTreeChanceCount;
-      node.headIndex = 0;
-    }
+    resetHeadByVersion(node, store);
 
     const nextChild = node.childs[node.headIndex];
-
     if (node.headIndex < node.childs.length - 1) {
       store.treeChances.push({
         treeNode: node,
@@ -219,8 +209,6 @@ function visiter(node: Node, scanner: Scanner, store: VisiterStore): boolean {
     if (nextChild) {
       node.headIndex++;
       visiter(nextChild, scanner, store);
-    } else {
-      callParentNode(node, scanner, store, node.astResult);
     }
   } else if (node instanceof FunctionNode) {
     const replacedNode = node.run();
@@ -230,6 +218,14 @@ function visiter(node: Node, scanner: Scanner, store: VisiterStore): boolean {
     visiter(replacedNode, scanner, store);
   } else {
     throw Error('Unexpected node type: ' + node);
+  }
+}
+
+function resetHeadByVersion(node: ParentNode, store: VisiterStore) {
+  if (node.version !== store.callTreeChanceCount) {
+    // If version not equal, reset headIndex
+    node.version = store.callTreeChanceCount;
+    node.headIndex = 0;
   }
 }
 
@@ -245,10 +241,10 @@ function callParentNode(node: Node, scanner: Scanner, store: VisiterStore, astVa
   }
 
   if (node.parentNode instanceof ChainNode) {
-    node.parentNode.astResults[node.parentNode.headIndex] = astValue;
+    // Equal to: const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
+    node.parentNode.astResults[node.parentNode.headIndex - 1] = astValue;
     visiter(node.parentNode, scanner, store);
   } else if (node.parentNode instanceof TreeNode) {
-    node.parentNode.astResult = astValue;
     callParentNode(node.parentNode, scanner, store, astValue);
   } else {
     throw Error('Unexpected parent node type: ' + node.parentNode);
