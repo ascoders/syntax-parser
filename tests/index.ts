@@ -34,19 +34,18 @@ sqlGroups.forEach(sqlGroup => {
 sqlTests.forEach(sqlTest => {
   sqlTest.childs.forEach(eachTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
-      t.true(true);
       const tokenizer = new Tokenizer(tokenConfig);
       const tokens = tokenizer.tokenize(eachTest.content);
       const result = new AstParser(tokens).parse();
 
-      if (!result) {
+      if (!result.success) {
         // tslint:disable-next-line:no-console
         console.log('tokens');
         // tslint:disable-next-line:no-console
         console.log(tokens);
       }
 
-      t.true(result);
+      t.true(result.success);
     });
   });
 });

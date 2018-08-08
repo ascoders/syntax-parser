@@ -26,7 +26,11 @@ function parse(str: string) {
   }
 }
 
-parse(`a b`);
+parse(`SELECT *
+FROM bananas
+WHERE color = 'red'
+
+`);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();

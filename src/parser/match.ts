@@ -66,8 +66,11 @@ export const matchWordOrStringOrNumber = createMatch(scanner =>
 export const matchTrue = () => true;
 export const matchFalse = () => false;
 
-export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements), true]);
+// TODO: 如何处理 ast 结果？
 
-export const plus = (...elements: any[]) => (chain: IChain) => chain(chain(...elements), optional(plus(...elements)));
+export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])();
 
-export const many = (...elements: any[]) => (chain: IChain) => optional(plus(...elements));
+export const plus = (...elements: any[]) => (chain: IChain) =>
+  chain(chain(...elements)(), optional(plus(...elements)))();
+
+export const many = (...elements: any[]) => (chain: IChain) => chain(optional(plus(...elements)))();

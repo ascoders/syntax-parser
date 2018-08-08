@@ -15,7 +15,7 @@
     "bundle": "pri bundle"
   },
   "devDependencies": {
-    "pri": "^0.10.8"
+    "pri": "^0.11.18"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
@@ -24,6 +24,6 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
-    "@babel/runtime": "^7.0.0-beta.51"
+    "@babel/runtime": "7.0.0-beta.56"
   }
 }

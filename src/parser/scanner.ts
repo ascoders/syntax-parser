@@ -34,6 +34,6 @@ export class Scanner {
   public setIndex = (index: number) => (this.index = index);
 
   public isEnd = () => {
-    return this.index >= this.tokens.length - 1;
+    return this.index >= this.tokens.length;
   };
 }

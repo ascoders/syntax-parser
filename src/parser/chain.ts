@@ -3,155 +3,123 @@ import { Scanner } from './scanner';
 
 type IMatchFn = () => IMatch;
 
-class ChainChild {
-  // If type is function, when run it, will expend.
-  public type: 'match' | 'chainNode' | 'function';
-  public node?: IMatchFn | ChainNode | ChainFunctionNode;
+type IAstStatement = any;
+
+type Node = MatchNode | FunctionNode | TreeNode | ChainNode;
+
+type ParentNode = TreeNode | ChainNode;
+
+class MatchNode {
+  public parentNode: ParentNode;
+
+  constructor(private matchFunction: IMatchFn, public originStr: string) {}
+
+  public run = () => this.matchFunction();
 }
 
-export class ChainNode {
-  public prev: ChainNode;
-  public next: ChainNode;
-  public childs: ChainChild[] = [];
-  public isFinished = true;
-  public scanner: Scanner;
+export class FunctionNode {
+  public parentNode: ParentNode;
 
-  private currentRunIndex = 0;
+  constructor(private chainFunction: FunctionElement, private scanner: Scanner) {}
 
-  public addChild = (nodeChild: ChainChild) => {
-    this.childs.push(nodeChild);
-    this.isFinished = false;
-  };
-
-  public run = (): { match: boolean; nextNode: ChainNode } => {
-    const childNode = this.childs[this.currentRunIndex];
-
-    if (!childNode) {
-      this.isFinished = true;
-      return { match: false, nextNode: null };
-    }
-
-    if (childNode.type === 'function') {
-      const functionResult = (childNode.node as ChainFunctionNode).exec();
-      // Rewrite current node.
-      this.childs[this.currentRunIndex] = createChainChildByElement(this, this.scanner, functionResult);
-      // Rerun.
-      return this.run();
-    }
-
-    this.isFinished = this.currentRunIndex + 1 > this.childs.length - 1;
-
-    this.currentRunIndex++;
-
-    switch (childNode.type) {
-      case 'chainNode':
-        return { match: true, nextNode: childNode.node as ChainNode };
-      case 'match':
-        const matchResult = (childNode.node as IMatchFn)();
-        return { match: matchResult, nextNode: null };
-      default:
-    }
-  };
-}
-
-export class ChainFunctionNode {
-  private chainFunction: IChain;
-  private scanner: Scanner;
-  private parentNode: ChainNode;
-
-  constructor(func: IChain, scanner: Scanner, parentNode: ChainNode) {
-    this.chainFunction = func;
-    this.scanner = scanner;
-    this.parentNode = parentNode;
-  }
-
-  public exec = () => {
+  public run = () => {
     return this.chainFunction(createChainNodeFactory(this.scanner, this.parentNode, this.chainFunction.name));
   };
 }
 
-const linkNode = (prevNode: ChainNode, nextNode: ChainNode) => {
-  if (!prevNode || !nextNode) {
-    return;
-  }
+class TreeNode {
+  public parentNode: ParentNode;
+  public childs: Node[] = [];
+  public astResult?: IAstStatement = null;
+  // Current running child index.
+  public headIndex = 0;
 
-  prevNode.next = nextNode;
-  nextNode.prev = prevNode;
-};
+  public version: number = 0;
+}
 
-export type IChain = (...elements: any[]) => ChainNode;
+export class ChainNode {
+  public parentNode: ParentNode;
+  public childs: Node[] = [];
+  public astResults?: IAstStatement[] = [];
+  // Current running child index.
+  public headIndex = 0;
 
-function createChainChildByElement(parentNode: ChainNode, scanner: Scanner, element: any) {
-  const chainChild = new ChainChild();
+  // Eg: const foo = chain => chain()(), so the chain functionName is 'foo'.
+  public functionName: string = null;
 
-  if (typeof element === 'string') {
-    chainChild.type = 'match';
-    chainChild.node = match(element)(scanner);
+  // When try new tree chance, set tree node and it's parent chain node a new version, so all child visiter will reset headIndex if version if different.
+  public version: number = 0;
+}
+
+type SingleElement = string | any;
+type IElement = SingleElement | SingleElement[];
+type IElements = IElement[];
+type ISolveAst = (...astResult: IAstStatement[]) => IAstStatement;
+export type IChain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNode;
+type FunctionElement = (chain: IChain) => ChainNode;
+
+const createNodeByElement = (
+  element: IElement,
+  scanner: Scanner,
+  parentNode: ParentNode,
+  functionName: string
+): Node => {
+  if (element instanceof Array) {
+    const treeNode = new TreeNode();
+    treeNode.parentNode = parentNode;
+    treeNode.childs = element.map(eachElement => createNodeByElement(eachElement, scanner, treeNode, functionName));
+    return treeNode;
+  } else if (typeof element === 'string') {
+    const matchNode = new MatchNode(match(element)(scanner), element);
+    matchNode.parentNode = parentNode;
+    return matchNode;
   } else if (typeof element === 'boolean') {
-    chainChild.type = 'match';
     if (element) {
-      chainChild.node = matchTrue;
+      const trueMatchNode = new MatchNode(matchTrue, 'true');
+      trueMatchNode.parentNode = parentNode;
+      return trueMatchNode;
     } else {
-      chainChild.node = matchFalse;
+      const falseMatchNode = new MatchNode(matchFalse, 'false');
+      falseMatchNode.parentNode = parentNode;
+      return falseMatchNode;
     }
   } else if (element instanceof ChainNode) {
-    chainChild.type = 'chainNode';
-    chainChild.node = element;
+    element.parentNode = parentNode;
+    element.functionName = functionName;
+    return element;
   } else if (typeof element === 'function') {
     if (element.prototype.name === 'match') {
-      element();
-      chainChild.type = 'match';
-      chainChild.node = element(scanner);
+      const matchNode = new MatchNode(element(scanner), 'null');
+      matchNode.parentNode = parentNode;
+      return matchNode;
     } else {
-      chainChild.type = 'function';
-      // To prevent stack overflow, don't run common function immediately.
-      const functionNode = new ChainFunctionNode(element as IChain, scanner, parentNode);
-      chainChild.node = functionNode;
+      const functionNode = new FunctionNode(element as FunctionElement, scanner);
+      functionNode.parentNode = parentNode;
+      return functionNode;
     }
   } else {
     throw Error(`unknow element in chain ${element}`);
   }
-
-  return chainChild;
-}
+};
 
 export const createChainNodeFactory = (
   scanner: Scanner,
-  parentNode?: ChainNode,
+  parentNode?: ParentNode,
   // If parent node is a function, here will get it's name.
   functionName?: string
-) => (...elements: any[]): ChainNode => {
-  let firstNode: ChainNode = null;
+) => (...elements: IElements) => (solveAst: ISolveAst = (...args) => args): ChainNode => {
+  const chainNode = new ChainNode();
+  chainNode.parentNode = parentNode;
+  chainNode.functionName = functionName;
 
   elements = solveDirectLeftRecursion(elements, functionName);
 
-  elements.reduce((prevNode: ChainNode, element) => {
-    const node = new ChainNode();
-    node.scanner = scanner;
+  chainNode.childs = elements.map(element => {
+    chainNode.astResults.push(null);
+    return createNodeByElement(element, scanner, chainNode, functionName);
+  });
 
-    if (!firstNode) {
-      firstNode = node;
-    }
-
-    // Set first、lastNode, and link it
-    if (prevNode === parentNode) {
-      node.prev = prevNode;
-    } else {
-      linkNode(prevNode, node);
-    }
-
-    if (element instanceof Array) {
-      element.forEach(eachElement => {
-        node.addChild(createChainChildByElement(node, scanner, eachElement));
-      });
-    } else {
-      node.addChild(createChainChildByElement(node, scanner, element));
-    }
-
-    return node;
-  }, parentNode);
-
-  return firstNode;
+  return chainNode;
 };
 
 /**
@@ -174,68 +142,152 @@ function solveDirectLeftRecursion(elements: any[], parentFunctionName: string) {
 }
 
 interface ITreeChance {
-  chainNode: ChainNode;
+  treeNode: TreeNode;
   tokenIndex: number;
 }
 
-function judgeChainResult(result: boolean, scanner: Scanner) {
-  if (scanner.isEnd()) {
-    return result;
-  } else {
-    return false;
-  }
+class VisiterStore {
+  public treeChances: ITreeChance[] = [];
+  public callVisiterCount = 0;
+  public callTreeChanceCount = 0;
+  public success: boolean = null;
+  public failReason: string = null;
 }
 
-export const execChain = (firstNode: ChainNode, scanner: Scanner) => {
-  const treeChances: ITreeChance[] = [];
-  let result = judgeChainResult(visiter(firstNode, scanner, treeChances), scanner);
+export const execChain = (chainNode: ChainNode, scanner: Scanner) => {
+  const visiterStore = new VisiterStore();
+  visiter(chainNode, scanner, visiterStore);
 
-  while (!result && treeChances.length > 0) {
-    const newChance = treeChances.pop();
-    scanner.setIndex(newChance.tokenIndex);
-    result = judgeChainResult(visiter(newChance.chainNode, scanner, treeChances), scanner);
-  }
-
-  return result;
+  return visiterStore;
 };
 
-function visiter(chainNode: ChainNode, scanner: Scanner, treeChances: ITreeChance[]): boolean {
-  const currentTokenIndex = scanner.getIndex();
+const MAX_VISITER_CALL = 100000;
+const MAX_TREE_CALL = 10000;
 
-  if (!chainNode) {
+function visiter(node: Node, scanner: Scanner, store: VisiterStore): boolean {
+  if (!node) {
     return false;
   }
 
-  const nodeResult = chainNode.run();
+  store.callVisiterCount++;
 
-  let nestedMatch = nodeResult.match;
-
-  if (nodeResult.match && nodeResult.nextNode) {
-    nestedMatch = visiter(nodeResult.nextNode, scanner, treeChances);
+  if (store.callVisiterCount > MAX_VISITER_CALL) {
+    store.success = false;
+    store.failReason = 'call visiter more then ' + MAX_VISITER_CALL;
+    return;
   }
 
-  if (nestedMatch) {
-    if (!chainNode.isFinished) {
-      // It's a new chance, because child match is true, so we can visit next node, but current node is not finished, so if finally falsely, we can go back here.
-      treeChances.push({
-        chainNode,
+  const currentTokenIndex = scanner.getIndex();
+
+  if (node instanceof ChainNode) {
+    if (node.version !== store.callTreeChanceCount) {
+      // If version not equal, reset headIndex
+      node.version = store.callTreeChanceCount;
+      node.headIndex = 0;
+    }
+
+    const nextChild = node.childs[node.headIndex];
+
+    if (nextChild) {
+      node.headIndex++;
+      visiter(nextChild, scanner, store);
+    } else {
+      callParentNode(node, scanner, store, node.astResults);
+    }
+  } else if (node instanceof MatchNode) {
+    if (!node.run()) {
+      tryChances(scanner, store);
+    } else {
+      callParentNode(node, scanner, store, 'some text');
+    }
+  } else if (node instanceof TreeNode) {
+    if (node.version !== store.callTreeChanceCount) {
+      // If version not equal, reset headIndex
+      node.version = store.callTreeChanceCount;
+      node.headIndex = 0;
+    }
+
+    const nextChild = node.childs[node.headIndex];
+
+    if (node.headIndex < node.childs.length - 1) {
+      store.treeChances.push({
+        treeNode: node,
         tokenIndex: currentTokenIndex
       });
     }
 
-    if (chainNode.next) {
-      return visiter(chainNode.next, scanner, treeChances);
+    if (nextChild) {
+      node.headIndex++;
+      visiter(nextChild, scanner, store);
     } else {
-      return true;
+      callParentNode(node, scanner, store, node.astResult);
     }
+  } else if (node instanceof FunctionNode) {
+    const replacedNode = node.run();
+
+    const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
+    node.parentNode.childs[parentIndex] = replacedNode;
+    visiter(replacedNode, scanner, store);
   } else {
-    if (chainNode.isFinished) {
-      // Game over, back to root chain.
-      return false;
+    throw Error('Unexpected node type: ' + node);
+  }
+}
+
+function callParentNode(node: Node, scanner: Scanner, store: VisiterStore, astValue: any) {
+  if (!node.parentNode) {
+    // Finish matching!
+    if (scanner.isEnd()) {
+      store.success = true;
     } else {
-      // Try again
-      scanner.setIndex(currentTokenIndex);
-      return visiter(chainNode, scanner, treeChances);
+      tryChances(scanner, store);
+    }
+    return;
+  }
+
+  if (node.parentNode instanceof ChainNode) {
+    node.parentNode.astResults[node.parentNode.headIndex] = astValue;
+    visiter(node.parentNode, scanner, store);
+  } else if (node.parentNode instanceof TreeNode) {
+    node.parentNode.astResult = astValue;
+    callParentNode(node.parentNode, scanner, store, astValue);
+  } else {
+    throw Error('Unexpected parent node type: ' + node.parentNode);
+  }
+}
+
+function tryChances(scanner: Scanner, store: VisiterStore) {
+  store.callTreeChanceCount++;
+
+  if (store.callTreeChanceCount > MAX_TREE_CALL) {
+    store.success = false;
+    store.failReason = 'call tree more then ' + MAX_TREE_CALL;
+    return;
+  }
+
+  if (store.treeChances.length === 0) {
+    store.success = false;
+    return;
+  }
+
+  const recentChance = store.treeChances.pop();
+
+  // reset scanner index
+  scanner.setIndex(recentChance.tokenIndex);
+
+  // reset parent node's index
+  recentChance.treeNode.version = store.callTreeChanceCount;
+  resetParentAndRestChilds(recentChance.treeNode, store);
+
+  visiter(recentChance.treeNode, scanner, store);
+}
+
+function resetParentAndRestChilds(node: Node, store: VisiterStore) {
+  if (node.parentNode) {
+    if (node.parentNode instanceof TreeNode || node.parentNode instanceof ChainNode) {
+      const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
+      node.parentNode.headIndex = parentIndex + 1;
+      node.parentNode.version = store.callTreeChanceCount;
+      resetParentAndRestChilds(node.parentNode, store);
     }
   }
 }
