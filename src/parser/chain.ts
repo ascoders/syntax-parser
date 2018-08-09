@@ -157,6 +157,8 @@ export const execChain = (chainNode: ChainNode, scanner: Scanner) => {
   const visiterStore = new VisiterStore();
   visiter(chainNode, scanner, visiterStore);
 
+  console.log('astResult', chainNode.astResults);
+
   return visiterStore;
 };
 

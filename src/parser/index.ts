@@ -23,10 +23,15 @@ const selectStatement = (chain: IChain) =>
     };
   });
 
-const notStatement = (chain: IChain) => chain('not', optional(notStatement))();
-
 // selectList ::= selectField ( , selectList )?
-const selectList = (chain: IChain) => chain(selectField, optional(',', selectList))();
+const selectList = (chain: IChain) =>
+  chain(selectField, optional(',', selectList))(ast => {
+    if (ast[1]) {
+      return ast[0].concat(ast[1][1]);
+    } else {
+      return ast[0];
+    }
+  });
 
 // whereStatement ::= WHERE expression
 const whereStatement = (chain: IChain) => chain('where', expression)();
@@ -38,10 +43,7 @@ const whereStatement = (chain: IChain) => chain('where', expression)();
 //           | *
 const selectField = (chain: IChain) =>
   chain([
-    chain(
-      [chain(optional(notStatement), field)(), chain(optional(notStatement), '(', field, ')')()],
-      optional(alias)
-    )(),
+    chain([chain(many('not'), field)(), chain(many('not'), '(', field, ')')()], optional(alias))(),
     chain(caseStatement, optional(alias))(),
     '*'
   ])();
@@ -100,7 +102,7 @@ const field = (chain: IChain) =>
     chain(stringOrWord, '.', '*')(),
     chain(stringOrWord, '.', stringOrWord)(),
     stringOrWord
-  ])();
+  ])(ast => ast[0]);
 
 // tableName ::= wordOrString alias?
 const tableName = (chain: IChain) => chain(stringOrWord, optional(alias))();
@@ -117,22 +119,22 @@ const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'e
 //             ::= WHEN expression THEN string
 const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringChain)();
 
-const wordChain = (chain: IChain) => chain(matchWord())();
+const wordChain = (chain: IChain) => chain(matchWord())(ast => ast[0]);
 
-const stringChain = (chain: IChain) => chain(matchString())();
+const stringChain = (chain: IChain) => chain(matchString())(ast => ast[0]);
 
-const numberChain = (chain: IChain) => chain(matchNumber())();
+const numberChain = (chain: IChain) => chain(matchNumber())(ast => ast[0]);
 
-const stringOrWord = (chain: IChain) => chain([wordChain, stringChain])();
+const stringOrWord = (chain: IChain) => chain([wordChain, stringChain])(ast => ast[0]);
 
 // function ::= word '(' number | * ')'
 const functionChain = (chain: IChain) => chain(wordChain, '(', [numberChain, '*'], ')')();
 
-const logicalOperator = (chain: IChain) => chain(['and', '&&', 'xor', 'or', '||'])();
+const logicalOperator = (chain: IChain) => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
-const comparisonOperator = (chain: IChain) => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])();
+const comparisonOperator = (chain: IChain) => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 
-const notOperator = (chain: IChain) => chain(['not', '!'])();
+const notOperator = (chain: IChain) => chain(['not', '!'])(ast => ast[0]);
 
 export class AstParser {
   private scanner: Scanner;
