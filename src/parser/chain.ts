@@ -245,20 +245,20 @@ export const execChain = (
     }
   });
 
-  let nextMatchNodes = cursorPrevNodes.reduce(
+  let nextMatchings = cursorPrevNodes.reduce(
     (all, cursorPrevMatchNode) => {
       return all.concat(findNextMatchNodes(cursorPrevMatchNode).map(each => each.matching));
     },
     [] as IMatching[]
   );
 
-  nextMatchNodes = uniqBy(nextMatchNodes, each => each.type + each.value);
+  nextMatchings = uniqBy(nextMatchings, each => each.type + each.value);
 
   return {
     success,
     ast,
     callVisiterCount,
-    nextMatchNodes: nextMatchNodes.reverse()
+    nextMatchings: nextMatchings.reverse()
   };
 };
 
