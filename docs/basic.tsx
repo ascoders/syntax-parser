@@ -26,13 +26,22 @@ function parse(str: string) {
   }
 }
 
-parse(`SELECT
-apple as "The Apple",
-pear The_Pear,
-orange AS [TheOrange],
-pineapple whereKeyword
-FROM bananas AS b;
+parse(`SELECT NOT bees AS [b]
+FROM hats;
 
+`);
+
+parse(`SELECT NOT bees AS [b]
+FROM hats;
+
+SELECT NOT not bees AS [b]
+FROM hats;
+
+SELECT NOT (bees) AS [b]
+FROM hats;
+
+SELECT NOT not (bees) AS [b]
+FROM hats;
 `);
 
 export default class Page extends React.PureComponent<Props, State> {

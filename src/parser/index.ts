@@ -2,6 +2,7 @@ import { IToken } from '../lexer/interface';
 import { createChainNodeFactory, execChain, IChain } from './chain';
 import { many, matchNumber, matchString, matchWord, optional, plus } from './match';
 import { Scanner } from './scanner';
+import { binaryRecursionToArray } from './utils';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
@@ -9,32 +10,31 @@ const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
 const root = (chain: IChain) => chain(statements, optional(';'))(ast => ast[0]);
 
-const statements = (chain: IChain) => chain(statement, optional(';', statements))();
+const statements = (chain: IChain) => chain(statement, optional(';', statements))(binaryRecursionToArray);
 
 const statement = (chain: IChain) => chain([selectStatement])(ast => ast[0]);
 
 const selectStatement = (chain: IChain) =>
   chain('select', selectList, 'from', tableList, optional(whereStatement))(ast => {
-    return {
-      type: 'selectStatement',
-      fields: ast[1],
-      from: ast[3],
-      where: ast[4]
+    const result: any = {
+      type: 'statement',
+      variant: 'select',
+      result: ast[1],
+      from: ast[3]
     };
+
+    if (ast[4]) {
+      result.where = ast[4][0];
+    }
+
+    return result;
   });
 
 // selectList ::= selectField ( , selectList )?
-const selectList = (chain: IChain) =>
-  chain(selectField, optional(',', selectList))(ast => {
-    if (ast[1]) {
-      return ast[0].concat(ast[1][1]);
-    } else {
-      return ast[0];
-    }
-  });
+const selectList = (chain: IChain) => chain(selectField, optional(',', selectList))(binaryRecursionToArray);
 
 // whereStatement ::= WHERE expression
-const whereStatement = (chain: IChain) => chain('where', expression)();
+const whereStatement = (chain: IChain) => chain('where', expression)(ast => ast[1]);
 
 // selectField
 //         ::= not? field alias?
@@ -69,7 +69,7 @@ const expression = (chain: IChain) =>
     chain(predicate, many(logicalOperator, expression))(),
     chain(predicate, 'is', optional('not'), ['true', 'fasle', 'unknown'])(),
     chain('(', expression, ')')()
-  ])();
+  ])(ast => ast[0]);
 
 // predicate
 //       ::= predicate NOT? IN '(' fieldList ')'
@@ -138,14 +138,16 @@ const notOperator = (chain: IChain) => chain(['not', '!'])(ast => ast[0]);
 
 export class AstParser {
   private scanner: Scanner;
+  private cursorPosition = 0;
 
-  constructor(tokens: IToken[]) {
+  constructor(tokens: IToken[], cursorPosition = 0) {
     this.scanner = new Scanner(tokens);
+    this.cursorPosition = cursorPosition;
   }
 
   public parse = () => {
     const chainNodeFactory = createChainNodeFactory(this.scanner);
     const chainNode = chainNodeFactory(root)();
-    return execChain(chainNode, this.scanner);
+    return execChain(chainNode, this.scanner, this.cursorPosition, ast => ast[0]);
   };
 }

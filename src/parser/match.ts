@@ -38,15 +38,20 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMat
   }
 }
 
-function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch) {
+function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch, specialName?: string) {
   return (arg?: T) => {
     function foo(scanner: Scanner) {
       return () => fn(scanner, arg);
     }
     foo.prototype.name = 'match';
+    foo.prototype.displayName = specialName;
     return foo;
   };
 }
+
+export const match = createMatch((scanner, word: string | string[]) =>
+  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word))
+);
 
 export const matchWord = createMatch((scanner, word?: string | string[]) => {
   if (!word) {
@@ -54,25 +59,20 @@ export const matchWord = createMatch((scanner, word?: string | string[]) => {
   } else {
     return matchToken(scanner, token => token.type === tokenTypes.WORD && equalWordOrIncludeWords(token.value, word));
   }
-});
+}, 'word');
 
-export const match = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word))
+export const matchString = createMatch(
+  scanner => matchToken(scanner, token => token.type === tokenTypes.STRING),
+  'string'
 );
 
-export const matchString = createMatch(scanner => matchToken(scanner, token => token.type === tokenTypes.STRING));
-
-export const matchNumber = createMatch(scanner => matchToken(scanner, token => token.type === tokenTypes.NUMBER));
+export const matchNumber = createMatch(
+  scanner => matchToken(scanner, token => token.type === tokenTypes.NUMBER),
+  'number'
+);
 
 export const matchWordOrString = createMatch(scanner =>
   matchToken(scanner, token => token.type === tokenTypes.WORD || token.type === tokenTypes.STRING)
-);
-
-export const matchWordOrStringOrNumber = createMatch(scanner =>
-  matchToken(
-    scanner,
-    token => token.type === tokenTypes.WORD || token.type === tokenTypes.STRING || token.type === tokenTypes.NUMBER
-  )
 );
 
 export const matchTrue = (): IMatch => ({
@@ -83,8 +83,6 @@ export const matchFalse = (): IMatch => ({
   token: null,
   match: true
 });
-
-// TODO: 如何处理 ast 结果？
 
 export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])(ast => ast[0]);
 

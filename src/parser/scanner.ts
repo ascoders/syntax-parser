@@ -36,4 +36,16 @@ export class Scanner {
   public isEnd = () => {
     return this.index >= this.tokens.length;
   };
+
+  public getPrevTokenFromCharacterIndex = (characterIndex: number) => {
+    let prevToken: IToken = null;
+
+    this.tokens.forEach(token => {
+      if (token.position[1] < characterIndex) {
+        prevToken = token;
+      }
+    });
+
+    return prevToken;
+  };
 }
