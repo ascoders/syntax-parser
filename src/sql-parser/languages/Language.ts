@@ -287,7 +287,6 @@ const reservedToplevelWords = [
   'GROUP BY',
   'GO',
   'HAVING',
-  'INSERT INTO',
   'INSERT',
   'INTERSECT',
   'LIMIT',

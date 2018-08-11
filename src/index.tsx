@@ -1,5 +1,5 @@
-import { normal } from './languages';
+import { normal } from './sql-parser/languages';
 
 export const tokenConfig = normal;
 export { Tokenizer } from './lexer';
-export { AstParser } from './parser';
+export { SQLAstParser } from './sql-parser';

@@ -40,8 +40,8 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMat
 
 function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch, specialName?: string) {
   return (arg?: T) => {
-    function foo(scanner: Scanner) {
-      return () => fn(scanner, arg);
+    function foo() {
+      return (scanner: Scanner) => fn(scanner, arg);
     }
     foo.prototype.name = 'match';
     foo.prototype.displayName = specialName;

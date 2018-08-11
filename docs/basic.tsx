@@ -1,16 +1,18 @@
 import * as React from 'react';
-import { AstParser, tokenConfig, Tokenizer } from '../src';
+import { SQLAstParser, tokenConfig, Tokenizer } from '../src';
 
 class Props {}
 
 class State {}
+
+const parser = new SQLAstParser();
 
 function parse(str: string) {
   const startTime = new Date();
   const tokenizer = new Tokenizer(tokenConfig);
   const tokens = tokenizer.tokenize(str);
   const endTime1 = new Date();
-  const result = new AstParser(tokens).parse();
+  const result = parser.parse(tokens, 20);
   const endTime2 = new Date();
 
   // tslint:disable-next-line:no-console
@@ -26,22 +28,8 @@ function parse(str: string) {
   }
 }
 
-parse(`SELECT NOT bees AS [b]
-FROM hats;
-
-`);
-
-parse(`SELECT NOT bees AS [b]
-FROM hats;
-
-SELECT NOT not bees AS [b]
-FROM hats;
-
-SELECT NOT (bees) AS [b]
-FROM hats;
-
-SELECT NOT not (bees) AS [b]
-FROM hats;
+parse(`
+select a from b;
 `);
 
 export default class Page extends React.PureComponent<Props, State> {
