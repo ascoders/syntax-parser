@@ -12,7 +12,7 @@ function parse(str: string) {
   const tokenizer = new Tokenizer(tokenConfig);
   const tokens = tokenizer.tokenize(str);
   const endTime1 = new Date();
-  const result = parser.parse(tokens, 20);
+  const result = parser.parse(tokens, 0);
   const endTime2 = new Date();
 
   // tslint:disable-next-line:no-console
@@ -29,49 +29,105 @@ function parse(str: string) {
 }
 
 parse(`
-INSERT INTO test_dwi_pub_hbd_slr_dtr_002 SELECT
-  concat_ws(
-    '\u0004',
-    concat(
-      SUBSTRING(md5(concat(shop_id, '111111')), 1, 4),
-      ':md5'
-    ),
-    '93206:app',
-    concat('ddd:', stat_date)
-  ) as rowkey,
-  count(1) as pv,
-  COUNT(DISTINCT visitor_id) as uv,
-  COUNT(
-    DISTINCT CASE
-      WHEN url_type = 'ipv' THEN visitor_id
-      ELSE NULL
-    END
-  ) AS ipv FROM (
+--Blink SQL
+--********************************************************************--
+--Author: 黄晓锋
+--CreateTime: 2018-07-06 16:09:04
+--Comment: lazada测试
+--********************************************************************--
+CREATE VIEW trade_order_line_view AS
+SELECT
+  '\${venture}' AS venture,
+  trade_order_line_id AS trade_order_line_id,
+  trade_order_id AS trade_order_id,
+  seller_id AS seller_id,
+  buyer_id AS buyer_id,
+  sku_id AS asc_sku_id,
+  item_id AS asc_item_id,
+  category_id AS category_id,
+  FIRST_VALUE(seller_full_name) AS seller_full_name,
+  FIRST_VALUE(buyer_full_name) AS buyer_full_name,
+  FIRST_VALUE(sku_info) AS sku_info,
+  FIRST_VALUE(item_title) AS item_title,
+  FIRST_VALUE(quantity) AS quantity,
+  FIRST_VALUE(actual_fee) AS actual_fee,
+  FIRST_VALUE(actual_fee_currency_code) AS actual_fee_currency_code,
+  FIRST_VALUE(shipping_actual_fee) AS shipping_actual_fee,
+  FIRST_VALUE(shipping_actual_fee_currency_code) AS shipping_actual_fee_currency_code,
+  FIRST_VALUE(features) AS features,
+  FIRST_VALUE(features_cc) AS features_cc,
+  FIRST_VALUE(site_id) AS site_id,
+  KEYVALUE(
+    FIRST_VALUE(features),
+    ';',
+    ':',
+    's_sp_c'
+  ) AS bob_simple_sku,
+  FIRST_VALUE(
+    REGEXP_REPLACE(
+      JSON_VALUE(sale_discount_info, '$.[*]'),
+      '\\},\\{',
+      '\\},,,,\\{'
+    )
+  ) AS sale_discount_info_tmp,
+  FIRST_VALUE(
+    REGEXP_REPLACE(
+      JSON_VALUE(shipping_discount_info, '$.[*]'),
+      '\\},\\{',
+      '\\},,,,\\{'
+    )
+  ) AS shipping_discount_info_tmp,
+  FIRST_VALUE(sale_discount_info) as sale_discount_info,
+  FIRST_VALUE(shipping_discount_info) as shipping_discount_info
+FROM
+  lzd_id_trade_order_line
+GROUP BY
+  trade_order_line_id,
+  trade_order_id,
+  seller_id,
+  buyer_id,
+  sku_id,
+  item_id,
+  category_id;
+
+  CREATE VIEW trade_order_line_history_view AS
+SELECT
+  data_time,
+  trade_order_line_id,
+  SUBSTRING(data_time, 1, 8) AS stat_date,
+  SUBSTRING(data_time, 9, 2) AS stat_hour
+FROM
+  (
     SELECT
-      stat_date,
-      stat_hour,
-      visitor_id,
-      url_shop as shop_id,
-      url_type,
-      DateFormatChangeWithZone(stat_date, 'yyyyMMdd', 'yyyyMMdd') as tmp FROM dwd_log_aplus_shop_ri union ALL SELECT
-      stat_date,
-      stat_hour,
-      visitor_id,
-      shop_id,
-      url_type,
-      DateFormatChangeWithZone(stat_date, 'yyyyMMdd', 'yyyyMMdd') as tmp FROM
-      dwd_log_usertrack_shop_ri
-  ) t
-group by
-  concat_ws(
-    '\u0004',
-    concat(
-      SUBSTRING(md5(concat(shop_id, '111111')), 1, 4),
-      ':md5'
-    ),
-    '93206:app',
-    concat('ddd:', stat_date)
-  ) ;
+      FIRST_VALUE(
+        IF(
+          '\${venture}' IN ('TH', 'VN', 'ID'),
+          DateFormatChangeWithZone(operate_time, 'yyyyMMddHHmmss', 'Asia/Bangkok'),
+          DATE_FORMAT(
+            TO_TIMESTAMP(CAST(operate_time AS BIGINT)),
+            'yyyyMMddHHmmss'
+          )
+        )
+      ) AS data_time,
+      trade_order_line_id AS trade_order_line_id
+    FROM
+      lzd_id_trade_order_line_history
+    WHERE
+      operate_time IS NOT NULL
+      AND IF(
+        '\${venture}' IN ('TH', 'VN', 'ID'),
+        DateFormatChangeWithZone(operate_time, 'yyyy-MM-dd', 'Asia/Bangkok'),
+        DATE_FORMAT(
+          TO_TIMESTAMP(CAST(operate_time AS BIGINT)),
+          'yyyy-MM-dd'
+        )
+      ) >= DATE_SUB(CURRENT_TIMESTAMP, 2)
+      AND action_type = '1'
+      AND UPPER(action_code) IN ('DELIVERY_ORDER_CREATE')
+    GROUP BY
+      trade_order_line_id
+  ) tmp;
+
 `);
 
 export default class Page extends React.PureComponent<Props, State> {

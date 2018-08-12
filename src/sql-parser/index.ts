@@ -22,7 +22,8 @@ const root = (chain: IChain) => chain(statements, optional(';'))(ast => ast[0]);
 
 const statements = (chain: IChain) => chain(statement, optional(';', statements))(binaryRecursionToArray);
 
-const statement = (chain: IChain) => chain([selectStatement, createTableStatement, insertStatement])(ast => ast[0]);
+const statement = (chain: IChain) =>
+  chain([selectStatement, createTableStatement, insertStatement, createViewStatement])(ast => ast[0]);
 
 // select statement ----------------------------
 
@@ -81,9 +82,11 @@ const tableOptions = (chain: IChain) => chain(tableOption, optional(',', tableOp
 
 const tableOption = (chain: IChain) => chain(stringOrWord, dataType)();
 
-const dataType = (chain: IChain) => chain(['int', 'varchar'])(ast => ast[0]);
-
 const tableName = (chain: IChain) => chain(wordChain)();
+
+// Create view statement ----------------------------
+
+const createViewStatement = (chain: IChain) => chain('create', 'view', wordChain, 'as', selectStatement)();
 
 // Insert statement ----------------------------
 
@@ -100,12 +103,19 @@ const groupByItems = (chain: IChain) => chain(expression, optional(',', groupByI
 
 // Function ---------------------------------------
 
-const functionChain = (chain: IChain) => chain(wordChain, '(', optional(functionFields), ')')();
+const functionChain = (chain: IChain) => chain([castFunction, normalFunction])();
 
 const functionFields = (chain: IChain) => chain(functionFieldItem, optional(',', functionFields))();
 
 const functionFieldItem = (chain: IChain) =>
   chain([numberChain, stringChain, chain(many(selectSpec), [wordChain, caseStatement])(), functionChain, '*'])();
+
+// TODO:
+const ifFunction = (chain: IChain) => chain()();
+
+const castFunction = (chain: IChain) => chain('cast', '(', wordChain, 'as', dataType, ')')();
+
+const normalFunction = (chain: IChain) => chain(wordChain, '(', optional(functionFields), ')')();
 
 // Case -----------------------------------------
 
@@ -114,6 +124,19 @@ const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'e
 const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringOrWord)();
 
 // Utils -----------------------------------------
+
+// TODO: https://github.com/antlr/grammars-v4/blob/master/mysql/MySqlParser.g4#L1963
+const dataType = (chain: IChain) =>
+  chain([
+    chain(['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext']),
+    chain(['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint']),
+    chain(['real', 'double', 'float']),
+    chain(['decimal', 'numberic']),
+    chain(['date', 'tinyblob', 'blob', 'mediumblob', 'longblob', 'bool', 'boolean']),
+    chain(['bit', 'time', 'timestamp', 'datetime', 'binary', 'varbinary', 'year']),
+    chain(['enum', 'set']),
+    chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')
+  ])(ast => ast[0]);
 
 // expression
 //        ::= notOperator expression
