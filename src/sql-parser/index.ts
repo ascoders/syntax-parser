@@ -27,20 +27,21 @@ const statement = (chain: IChain) => chain([selectStatement, createTableStatemen
 // select statement ----------------------------
 
 const selectStatement = (chain: IChain) =>
-  chain('select', selectList, 'from', tableList, optional(whereStatement))(ast => {
+  chain('select', selectList, fromClause, optional(union, selectStatement))(ast => {
     const result: any = {
       type: 'statement',
       variant: 'select',
       result: ast[1],
-      from: ast[3]
+      from: ast[2]
     };
-
-    if (ast[4]) {
-      result.where = ast[4][0];
-    }
 
     return result;
   });
+
+const union = (chain: IChain) => chain('union', ['all', 'distinct'])();
+
+const fromClause = (chain: IChain) =>
+  chain('from', tableSources, optional(whereStatement), optional('group', 'by', groupByItems))();
 
 // selectList ::= selectField ( , selectList )?
 const selectList = (chain: IChain) => chain(selectField, optional(',', selectList))(binaryRecursionToArray);
@@ -64,23 +65,13 @@ const selectField = (chain: IChain) =>
 //       ::= field (, fieldList)?
 const fieldList = (chain: IChain) => chain(field, optional(',', fieldList))();
 
-// tableList ::= tableName ( , tableList )?
-const tableList = (chain: IChain) => chain(tableName, optional(',', tableList))();
+const tableSources = (chain: IChain) => chain(tableSourceItem, optional(',', tableSources))();
 
-// tableName ::= wordOrString alias?
-const tableName = (chain: IChain) => chain(stringOrWord, optional(alias))();
+const tableSourceItem = (chain: IChain) => chain([tableName, chain('(', selectStatement, ')')], optional(alias))();
 
 // Alias ::= AS WordOrString
 //         | WordOrString
 const alias = (chain: IChain) => chain([chain('as', stringOrWord)(), stringOrWord])();
-
-// caseStatement
-//           ::= CASE caseAlternative+ ELSE string END
-const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'else', stringChain, 'end')();
-
-// caseAlternative
-//             ::= WHEN expression THEN string
-const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringChain)();
 
 // Create table statement ----------------------------
 
@@ -92,7 +83,9 @@ const tableOption = (chain: IChain) => chain(stringOrWord, dataType)();
 
 const dataType = (chain: IChain) => chain(['int', 'varchar'])(ast => ast[0]);
 
-// Insert statement
+const tableName = (chain: IChain) => chain(wordChain)();
+
+// Insert statement ----------------------------
 
 const insertStatement = (chain: IChain) =>
   chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
@@ -100,6 +93,25 @@ const insertStatement = (chain: IChain) =>
 const selectFieldsInfo = (chain: IChain) => chain('(', selectFields, ')')();
 
 const selectFields = (chain: IChain) => chain(wordChain, optional(',', selectFields))();
+
+// groupBy ---------------------------------------
+
+const groupByItems = (chain: IChain) => chain(expression, optional(',', groupByItems))();
+
+// Function ---------------------------------------
+
+const functionChain = (chain: IChain) => chain(wordChain, '(', optional(functionFields), ')')();
+
+const functionFields = (chain: IChain) => chain(functionFieldItem, optional(',', functionFields))();
+
+const functionFieldItem = (chain: IChain) =>
+  chain([numberChain, stringChain, chain(many(selectSpec), [wordChain, caseStatement])(), functionChain, '*'])();
+
+// Case -----------------------------------------
+
+const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'else', [stringChain, 'null'], 'end')();
+
+const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringOrWord)();
 
 // Utils -----------------------------------------
 
@@ -160,14 +172,26 @@ const numberChain = (chain: IChain) => chain(matchNumber())(ast => ast[0]);
 
 const stringOrWord = (chain: IChain) => chain([wordChain, stringChain])(ast => ast[0]);
 
-// function ::= word '(' number | * ')'
-const functionChain = (chain: IChain) => chain(wordChain, '(', [numberChain, '*'], ')')();
-
 const logicalOperator = (chain: IChain) => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
 const comparisonOperator = (chain: IChain) => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 
 const notOperator = (chain: IChain) => chain(['not', '!'])(ast => ast[0]);
+
+const selectSpec = (chain: IChain) =>
+  chain([
+    'all',
+    'distinct',
+    'distinctrow',
+    'high_priority',
+    'straight_join',
+    'sql_small_result',
+    'sql_big_result',
+    'sql_buffer_result',
+    'sql_cache',
+    'sql_no_cache',
+    'sql_calc_found_rows'
+  ])(ast => ast[0]);
 
 export class SQLAstParser {
   public rootChainNode: ChainNode;

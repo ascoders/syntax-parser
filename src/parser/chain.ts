@@ -2,6 +2,7 @@ import { defaults, uniqBy } from 'lodash';
 import { IToken } from '../lexer/interface';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
+import { tailCallOptimize } from './utils';
 
 let globalVersion = 0;
 
@@ -270,7 +271,7 @@ function newVisiter(node: Node, version: number, scanner: Scanner, visiterOption
   visiter(node, newStore, visiterOption);
 }
 
-function visiter(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
+const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption: VisiterOption) => {
   if (!node) {
     return false;
   }
@@ -317,33 +318,35 @@ function visiter(node: Node, store: VisiterStore, visiterOption: VisiterOption) 
   } else {
     throw Error('Unexpected node type: ' + node);
   }
-}
+});
 
-function callParentNode(node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) {
-  if (!node.parentNode) {
-    // Finish matching!
-    if (store.scanner.isEnd()) {
-      if (visiterOption.onSuccess) {
-        visiterOption.onSuccess();
+const callParentNode = tailCallOptimize(
+  (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
+    if (!node.parentNode) {
+      // Finish matching!
+      if (store.scanner.isEnd()) {
+        if (visiterOption.onSuccess) {
+          visiterOption.onSuccess();
+        }
+      } else {
+        tryChances(node, store, visiterOption);
       }
-    } else {
-      tryChances(node, store, visiterOption);
+      return;
     }
-    return;
-  }
 
-  if (node.parentNode instanceof ChainNode) {
-    // Equal to: const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
-    if (visiterOption.generateAst) {
-      node.parentNode.astResults[node.parentNode.headIndex - 1] = astValue;
+    if (node.parentNode instanceof ChainNode) {
+      // Equal to: const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
+      if (visiterOption.generateAst) {
+        node.parentNode.astResults[node.parentNode.headIndex - 1] = astValue;
+      }
+      visiter(node.parentNode, store, visiterOption);
+    } else if (node.parentNode instanceof TreeNode) {
+      callParentNode(node.parentNode, store, visiterOption, astValue);
+    } else {
+      throw Error('Unexpected parent node type: ' + node.parentNode);
     }
-    visiter(node.parentNode, store, visiterOption);
-  } else if (node.parentNode instanceof TreeNode) {
-    callParentNode(node.parentNode, store, visiterOption, astValue);
-  } else {
-    throw Error('Unexpected parent node type: ' + node.parentNode);
   }
-}
+);
 
 function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
   store.version = getNewVersion();
@@ -375,7 +378,7 @@ function resetHeadByVersion(node: ParentNode, store: VisiterStore, visiterOption
   }
 }
 
-function resetParentsHeadIndexAndVersion(node: Node, version: number) {
+const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: number) => {
   if (node.parentNode) {
     if (node.parentNode instanceof TreeNode || node.parentNode instanceof ChainNode) {
       const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
@@ -384,7 +387,7 @@ function resetParentsHeadIndexAndVersion(node: Node, version: number) {
       resetParentsHeadIndexAndVersion(node.parentNode, version);
     }
   }
-}
+});
 
 function findNextMatchNodes(node: Node): MatchNode[] {
   const newVersion = getNewVersion();
