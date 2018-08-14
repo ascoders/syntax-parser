@@ -42,9 +42,9 @@ sqlTests.forEach(sqlTest => {
 
       if (!result.success) {
         // tslint:disable-next-line:no-console
-        console.log('tokens');
+        // console.log('tokens');
         // tslint:disable-next-line:no-console
-        console.log(tokens);
+        // console.log(tokens);
       }
 
       t.true(result.success);

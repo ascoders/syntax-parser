@@ -1,4 +1,4 @@
-import { IToken } from '../lexer/interface';
+import { IToken } from '../lexer/token';
 import {
   ChainNode,
   createChainNodeFactory,
@@ -68,7 +68,7 @@ const fieldList = (chain: IChain) => chain(field, optional(',', fieldList))();
 
 const tableSources = (chain: IChain) => chain(tableSourceItem, optional(',', tableSources))();
 
-const tableSourceItem = (chain: IChain) => chain([tableName, chain('(', selectStatement, ')')], optional(alias))();
+const tableSourceItem = (chain: IChain) => chain([tableName, chain('(', selectStatement, ')')()], optional(alias))();
 
 // Alias ::= AS WordOrString
 //         | WordOrString
@@ -107,8 +107,7 @@ const functionChain = (chain: IChain) => chain([castFunction, normalFunction])()
 
 const functionFields = (chain: IChain) => chain(functionFieldItem, optional(',', functionFields))();
 
-const functionFieldItem = (chain: IChain) =>
-  chain([numberChain, stringChain, chain(many(selectSpec), [wordChain, caseStatement])(), functionChain, '*'])();
+const functionFieldItem = (chain: IChain) => chain(many(selectSpec), [field, caseStatement])();
 
 // TODO:
 const ifFunction = (chain: IChain) => chain()();
@@ -138,53 +137,39 @@ const dataType = (chain: IChain) =>
     chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')
   ])(ast => ast[0]);
 
-// expression
-//        ::= notOperator expression
-//          | notOperator '(' expression ')'
-//          | predicate logicalOperator expression
-//          | '(' expression ')' logicalOperator '(' expression ')'
-//          | predicate IS NOT? (TRUE | FALSE | UNKNOWN)
-//          | ( expression )
 const expression = (chain: IChain) =>
   chain([
-    chain(notOperator, expression)(),
-    chain(notOperator, '(', expression, ')')(),
-    chain(predicate, many(logicalOperator, expression))(),
-    chain(predicate, 'is', optional('not'), ['true', 'fasle', 'unknown'])(),
+    chain(notOperator, [expression, chain('(', expression, ')')()])(),
+    chain(predicate, [
+      many(logicalOperator, expression),
+      chain('is', optional('not'), ['true', 'fasle', 'unknown'])()
+    ])(),
     chain('(', expression, ')')()
   ])(ast => ast[0]);
 
-// predicate
-//       ::= predicate NOT? IN '(' fieldList ')'
-//         | left=predicate comparisonOperator right=predicate
-//         | predicate NOT? BETWEEN predicate AND predicate
-//         | predicate SOUNDS LIKE predicate
-//         | predicate NOT? LIKE predicate (ESCAPE STRING_LITERAL)?
-//         | field
-//         | ( predicate )
 const predicate = (chain: IChain) =>
   chain([
-    chain(fieldList, optional('not'), 'in', '(', fieldList, ')')(),
-    chain(fieldList, comparisonOperator, field)(),
-    chain(fieldList, optional('not'), 'between', predicate, 'and', predicate)(),
-    chain(fieldList, 'like', stringChain)(),
-    field,
-    chain('(', predicate, ')')()
+    chain(fieldList, [
+      chain(optional('not'), 'in', '(', fieldList, ')')(),
+      chain(comparisonOperator, field)(),
+      chain(optional('not'), 'between', predicate, 'and', predicate)(),
+      chain('like', stringChain)()
+    ])(),
+    chain('(', predicate, ')')(),
+    field
   ])();
 
-// field
-//   ::= <function>
-//     | <number>
-//     | <stringOrWord>.*
-//     | <stringOrWord>.<stringOrWord>
-//     | <stringOrWord>
 const field = (chain: IChain) =>
+  chain(fieldItem, optional([chain('/', field)(), chain('+', field)(), chain('-', field)()]))();
+
+const fieldItem = (chain: IChain) =>
   chain([
     functionChain,
     numberChain,
-    chain(stringOrWord, '.', '*')(),
-    chain(stringOrWord, '.', stringOrWord)(),
-    stringOrWord
+    chain(stringOrWordOrNumber, '.', '*')(),
+    chain(stringOrWordOrNumber, '.', stringOrWordOrNumber)(),
+    stringOrWordOrNumber,
+    '*'
   ])(ast => ast[0]);
 
 const wordChain = (chain: IChain) => chain(matchWord())(ast => ast[0]);
@@ -194,6 +179,8 @@ const stringChain = (chain: IChain) => chain(matchString())(ast => ast[0]);
 const numberChain = (chain: IChain) => chain(matchNumber())(ast => ast[0]);
 
 const stringOrWord = (chain: IChain) => chain([wordChain, stringChain])(ast => ast[0]);
+
+const stringOrWordOrNumber = (chain: IChain) => chain([wordChain, stringChain, numberChain])(ast => ast[0]);
 
 const logicalOperator = (chain: IChain) => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 

@@ -1,5 +1,5 @@
-import { normal } from './sql-parser/languages';
+import { fbi } from './sql-parser/languages/fbi';
 
-export const tokenConfig = normal;
+export const tokenConfig = fbi;
 export { Tokenizer } from './lexer';
 export { SQLAstParser } from './sql-parser';

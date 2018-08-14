@@ -1,5 +1,5 @@
 import { defaults, uniqBy } from 'lodash';
-import { IToken } from '../lexer/interface';
+import { IToken } from '../lexer/token';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 import { tailCallOptimize } from './utils';
@@ -27,7 +27,7 @@ export interface IMatching {
   value: string | boolean;
 }
 
-const MAX_VISITER_CALL = 100000;
+const MAX_VISITER_CALL = 1000000;
 
 class VisiterOption {
   public onCallVisiter?: (node?: Node) => void;
@@ -52,7 +52,7 @@ class VisiterOption {
 class MatchNode {
   public parentNode: ParentNode;
 
-  constructor(private matchFunction: IMatchFn, public matching?: IMatching) {}
+  constructor(private matchFunction: IMatchFn, public matching: IMatching, public parentIndex: number) {}
 
   public run = (scanner: Scanner) => this.matchFunction(scanner);
 }
@@ -60,10 +60,10 @@ class MatchNode {
 export class FunctionNode {
   public parentNode: ParentNode;
 
-  constructor(private chainFunction: FunctionElement) {}
+  constructor(private chainFunction: FunctionElement, public parentIndex: number) {}
 
   public run = () => {
-    return this.chainFunction(createChainNodeFactory(this.parentNode, this.chainFunction.name));
+    return this.chainFunction(createChainNodeFactory(this.parentNode, this.chainFunction.name, this.parentIndex));
   };
 }
 
@@ -74,6 +74,8 @@ class TreeNode {
   public headIndex = 0;
 
   public version: number = null;
+
+  constructor(public parentIndex: number) {}
 }
 
 export class ChainNode {
@@ -90,6 +92,8 @@ export class ChainNode {
 
   // When try new tree chance, set tree node and it's parent chain node a new version, so all child visiter will reset headIndex if version if different.
   public version: number = null;
+
+  constructor(public parentIndex: number) {}
 }
 
 type SingleElement = string | any;
@@ -99,49 +103,75 @@ type ISolveAst = (astResult: IAst[]) => IAst;
 export type IChain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNode;
 type FunctionElement = (chain: IChain) => ChainNode;
 
-const createNodeByElement = (element: IElement, parentNode: ParentNode, functionName: string): Node => {
+const createNodeByElement = (
+  element: IElement,
+  parentNode: ParentNode,
+  functionName: string,
+  parentIndex: number
+): Node => {
   if (element instanceof Array) {
-    const treeNode = new TreeNode();
+    const treeNode = new TreeNode(parentIndex);
     treeNode.parentNode = parentNode;
-    treeNode.childs = element.map(eachElement => createNodeByElement(eachElement, treeNode, functionName));
+    treeNode.childs = element.map((eachElement, childIndex) =>
+      createNodeByElement(eachElement, treeNode, functionName, childIndex)
+    );
     return treeNode;
   } else if (typeof element === 'string') {
-    const matchNode = new MatchNode(match(element)(), {
-      type: 'string',
-      value: element
-    });
+    const matchNode = new MatchNode(
+      match(element)(),
+      {
+        type: 'string',
+        value: element
+      },
+      parentIndex
+    );
     matchNode.parentNode = parentNode;
     return matchNode;
   } else if (typeof element === 'boolean') {
     if (element) {
-      const trueMatchNode = new MatchNode(matchTrue, {
-        type: 'loose',
-        value: true
-      });
+      const trueMatchNode = new MatchNode(
+        matchTrue,
+        {
+          type: 'loose',
+          value: true
+        },
+        parentIndex
+      );
       trueMatchNode.parentNode = parentNode;
       return trueMatchNode;
     } else {
-      const falseMatchNode = new MatchNode(matchFalse, {
-        type: 'loose',
-        value: false
-      });
+      const falseMatchNode = new MatchNode(
+        matchFalse,
+        {
+          type: 'loose',
+          value: false
+        },
+        parentIndex
+      );
       falseMatchNode.parentNode = parentNode;
       return falseMatchNode;
     }
+    // TODO: ChainNode 不要立刻执行，要在这里最终执行，否则已经初始化的信息可能不准确。
   } else if (element instanceof ChainNode) {
     element.parentNode = parentNode;
     element.functionName = functionName;
+    element.parentIndex = parentIndex;
+    // element.parentNode.childs[parentIndex] = element;
     return element;
   } else if (typeof element === 'function') {
     if (element.prototype.name === 'match') {
-      const matchNode = new MatchNode(element(), {
-        type: 'special',
-        value: element.prototype.displayName
-      });
+      const matchNode = new MatchNode(
+        element(),
+        {
+          type: 'special',
+          value: element.prototype.displayName
+        },
+        parentIndex
+      );
       matchNode.parentNode = parentNode;
       return matchNode;
     } else {
-      const functionNode = new FunctionNode(element as FunctionElement);
+      const functionNode = new FunctionNode(element as FunctionElement, parentIndex);
       functionNode.parentNode = parentNode;
       return functionNode;
     }
@@ -153,16 +183,17 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, function
 export const createChainNodeFactory = (
   parentNode?: ParentNode,
   // If parent node is a function, here will get it's name.
-  functionName?: string
+  functionName?: string,
+  parentIndex = 0
 ) => (...elements: IElements) => (solveAst: ISolveAst = args => args): ChainNode => {
-  const chainNode = new ChainNode();
+  const chainNode = new ChainNode(parentIndex);
   chainNode.parentNode = parentNode;
   chainNode.functionName = functionName;
   chainNode.solveAst = solveAst;
 
   elements = solveDirectLeftRecursion(elements, functionName);
 
-  chainNode.childs = elements.map(element => createNodeByElement(element, chainNode, functionName));
+  chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, functionName, index));
 
   return chainNode;
 };
@@ -312,8 +343,7 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
   } else if (node instanceof FunctionNode) {
     const replacedNode = node.run();
 
-    const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
-    node.parentNode.childs[parentIndex] = replacedNode;
+    node.parentNode.childs[node.parentIndex] = replacedNode;
     visiter(replacedNode, store, visiterOption);
   } else {
     throw Error('Unexpected node type: ' + node);
@@ -335,9 +365,8 @@ const callParentNode = tailCallOptimize(
     }
 
     if (node.parentNode instanceof ChainNode) {
-      // Equal to: const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
       if (visiterOption.generateAst) {
-        node.parentNode.astResults[node.parentNode.headIndex - 1] = astValue;
+        node.parentNode.astResults[node.parentIndex] = astValue;
       }
       visiter(node.parentNode, store, visiterOption);
     } else if (node.parentNode instanceof TreeNode) {
@@ -380,12 +409,9 @@ function resetHeadByVersion(node: ParentNode, store: VisiterStore, visiterOption
 
 const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: number) => {
   if (node.parentNode) {
-    if (node.parentNode instanceof TreeNode || node.parentNode instanceof ChainNode) {
-      const parentIndex = node.parentNode.childs.findIndex(childNode => childNode === node);
-      node.parentNode.headIndex = parentIndex + 1;
-      node.parentNode.version = version;
-      resetParentsHeadIndexAndVersion(node.parentNode, version);
-    }
+    node.parentNode.headIndex = node.parentIndex + 1;
+    node.parentNode.version = version;
+    resetParentsHeadIndexAndVersion(node.parentNode, version);
   }
 });
 

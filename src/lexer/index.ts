@@ -1,5 +1,5 @@
 import { escapeRegExp, isEmpty } from 'lodash';
-import { IToken } from './interface';
+import { IToken } from './token';
 import tokenTypes from './token-types';
 
 export class Tokenizer {

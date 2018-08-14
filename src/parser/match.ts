@@ -1,4 +1,4 @@
-import { IToken } from '../lexer/interface';
+import { IToken } from '../lexer/token';
 import tokenTypes from '../lexer/token-types';
 import { IChain } from './chain';
 import { Scanner } from './scanner';
