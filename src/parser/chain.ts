@@ -27,10 +27,11 @@ export interface IMatching {
   value: string | boolean;
 }
 
-const MAX_VISITER_CALL = 1000000;
+const MAX_VISITER_CALL = 10000000;
 
 class VisiterOption {
   public onCallVisiter?: (node?: Node) => void;
+  public onCallParentNode?: (node?: Node) => void;
   public onSuccess?: () => void;
   public onFail?: (lastNode?: Node) => void;
   public generateAst?: boolean = true;
@@ -92,6 +93,9 @@ export class ChainNode {
 
   // When try new tree chance, set tree node and it's parent chain node a new version, so all child visiter will reset headIndex if version if different.
   public version: number = null;
+
+  // Enable match plus times.
+  public isPlus = false;
 
   constructor(public parentIndex: number) {}
 }
@@ -217,13 +221,14 @@ function solveDirectLeftRecursion(elements: any[], parentFunctionName: string) {
   return elements;
 }
 
-interface ITreeChance {
-  treeNode: TreeNode;
+interface IChance {
+  node: ParentNode;
+  headIndex: number;
   tokenIndex: number;
 }
 
 class VisiterStore {
-  public restTreeChances: ITreeChance[] = [];
+  public restChances: IChance[] = [];
 
   constructor(public scanner: Scanner, public version: number) {}
 }
@@ -243,15 +248,23 @@ export const execChain = (
   let success: boolean = false;
   let ast: IAst = null;
   let callVisiterCount = 0;
+  let callParentCount = 0;
 
   const newVersion = getNewVersion();
 
   newVisiter(chainNode, newVersion, scanner, {
-    onCallVisiter: () => {
+    onCallVisiter: node => {
       callVisiterCount++;
 
       if (callVisiterCount > MAX_VISITER_CALL) {
         throw Error('call visiter more then ' + MAX_VISITER_CALL);
+      }
+    },
+    onCallParentNode: node => {
+      callParentCount++;
+
+      if (callParentCount > MAX_VISITER_CALL) {
+        throw Error('call parent more then' + MAX_VISITER_CALL);
       }
     },
     onSuccess: () => {
@@ -314,7 +327,7 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
   const currentTokenIndex = store.scanner.getIndex();
 
   if (node instanceof ChainNode) {
-    resetHeadByVersion(node, store, visiterOption);
+    resetHeadByVersion(node, store);
 
     const nextChild = node.childs[node.headIndex];
     if (nextChild) {
@@ -326,13 +339,14 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
   } else if (node instanceof MatchNode) {
     visiterOption.onMatchNode(node, store, visiterOption);
   } else if (node instanceof TreeNode) {
-    resetHeadByVersion(node, store, visiterOption);
+    resetHeadByVersion(node, store);
 
     const nextChild = node.childs[node.headIndex];
     if (node.headIndex < node.childs.length - 1) {
-      store.restTreeChances.push({
-        treeNode: node,
-        tokenIndex: currentTokenIndex
+      store.restChances.push({
+        node,
+        tokenIndex: currentTokenIndex,
+        headIndex: node.headIndex + 1
       });
     }
 
@@ -352,6 +366,10 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
 
 const callParentNode = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
+    if (visiterOption.onCallParentNode) {
+      visiterOption.onCallParentNode(node);
+    }
+
     if (!node.parentNode) {
       // Finish matching!
       if (store.scanner.isEnd()) {
@@ -368,6 +386,16 @@ const callParentNode = tailCallOptimize(
       if (visiterOption.generateAst) {
         node.parentNode.astResults[node.parentIndex] = astValue;
       }
+
+      // If current node has isPlus, and run into callParentNode means it childs had match successful, so add a new chance.
+      if (node.parentNode.isPlus) {
+        store.restChances.push({
+          node: node.parentNode,
+          headIndex: 0,
+          tokenIndex: store.scanner.getIndex()
+        });
+      }
+
       visiter(node.parentNode, store, visiterOption);
     } else if (node.parentNode instanceof TreeNode) {
       callParentNode(node.parentNode, store, visiterOption, astValue);
@@ -380,26 +408,33 @@ const callParentNode = tailCallOptimize(
 function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
   store.version = getNewVersion();
 
-  if (store.restTreeChances.length === 0) {
+  if (store.restChances.length === 0) {
     if (visiterOption.onFail) {
       visiterOption.onFail(node);
     }
     return;
   }
 
-  const recentChance = store.restTreeChances.pop();
+  // console.log('try chance, chance before', store.restTreeChances.length);
+
+  const recentChance = store.restChances.pop();
+
+  // console.log('chance after', store.restTreeChances.length);
 
   // reset scanner index
   store.scanner.setIndex(recentChance.tokenIndex);
 
-  // reset parent node's index
-  recentChance.treeNode.version = store.version;
-  resetParentsHeadIndexAndVersion(recentChance.treeNode, store.version);
+  // reset node headIndex
+  recentChance.node.headIndex = recentChance.headIndex;
 
-  visiter(recentChance.treeNode, store, visiterOption);
+  // reset parent node's index
+  recentChance.node.version = store.version;
+  resetParentsHeadIndexAndVersion(recentChance.node, store.version);
+
+  visiter(recentChance.node, store, visiterOption);
 }
 
-function resetHeadByVersion(node: ParentNode, store: VisiterStore, visiterOption: VisiterOption) {
+function resetHeadByVersion(node: ParentNode, store: VisiterStore) {
   if (node.version !== store.version) {
     // If version not equal, reset headIndex
     node.version = store.version;

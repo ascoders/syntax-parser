@@ -86,7 +86,10 @@ export const matchFalse = (): IMatch => ({
 
 export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])(ast => ast[0]);
 
-export const plus = (...elements: any[]) => (chain: IChain) =>
-  chain(chain(...elements)(), optional(plus(...elements)))(ast => ast[0]);
+export const plus = (...elements: any[]) => (chain: IChain) => {
+  const result = chain(...elements)();
+  result.isPlus = true;
+  return result;
+};
 
-export const many = (...elements: any[]) => (chain: IChain) => chain(optional(plus(...elements)))(ast => ast[0]);
+export const many = (...elements: any[]) => optional(plus(...elements));

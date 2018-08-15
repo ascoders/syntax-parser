@@ -13,6 +13,7 @@ import {
   Scanner
 } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
+import { createFourOperations } from './four-operations';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
@@ -28,7 +29,14 @@ const statement = (chain: IChain) =>
 // select statement ----------------------------
 
 const selectStatement = (chain: IChain) =>
-  chain('select', selectList, fromClause, optional(union, selectStatement))(ast => {
+  chain(
+    'select',
+    selectList,
+    fromClause,
+    optional(orderByClause),
+    optional(limitClause),
+    optional(union, selectStatement)
+  )(ast => {
     const result: any = {
       type: 'statement',
       variant: 'select',
@@ -42,7 +50,7 @@ const selectStatement = (chain: IChain) =>
 const union = (chain: IChain) => chain('union', ['all', 'distinct'])();
 
 const fromClause = (chain: IChain) =>
-  chain('from', tableSources, optional(whereStatement), optional('group', 'by', groupByItems))();
+  chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
 
 // selectList ::= selectField ( , selectList )?
 const selectList = (chain: IChain) => chain(selectField, optional(',', selectList))(binaryRecursionToArray);
@@ -66,9 +74,28 @@ const selectField = (chain: IChain) =>
 //       ::= field (, fieldList)?
 const fieldList = (chain: IChain) => chain(field, optional(',', fieldList))();
 
-const tableSources = (chain: IChain) => chain(tableSourceItem, optional(',', tableSources))();
+const tableSources = (chain: IChain) => chain(tableSource, optional(',', tableSources))();
 
-const tableSourceItem = (chain: IChain) => chain([tableName, chain('(', selectStatement, ')')()], optional(alias))();
+const tableSource = (chain: IChain) =>
+  chain(
+    [chain(tableSourceItem, many(joinPart))(), chain('(', tableSourceItem, many(joinPart), ')')()],
+    optional(alias)
+  )();
+
+const tableSourceItem = (chain: IChain) =>
+  chain([
+    chain(tableName, optional(alias))(),
+    chain([selectStatement, chain('(', selectStatement, ')')()], optional(alias))(),
+    chain('(', tableSources, ')')()
+  ])();
+
+const joinPart = (chain: IChain) =>
+  chain([
+    chain(['inner', 'cross'], 'join', tableSourceItem, optional('on', expression))(),
+    chain('straight_join', tableSourceItem, optional('on', expression))(),
+    chain(['left', 'right'], optional('outer'), 'join', tableSourceItem, optional('on', expression))(),
+    chain('natural', optional(['left', 'right'], optional('outer')), 'join', tableSourceItem)()
+  ])();
 
 // Alias ::= AS WordOrString
 //         | WordOrString
@@ -82,7 +109,7 @@ const tableOptions = (chain: IChain) => chain(tableOption, optional(',', tableOp
 
 const tableOption = (chain: IChain) => chain(stringOrWord, dataType)();
 
-const tableName = (chain: IChain) => chain(wordChain)();
+const tableName = (chain: IChain) => chain([wordChain, chain(wordChain, '.', wordChain)()])();
 
 // Create view statement ----------------------------
 
@@ -99,18 +126,31 @@ const selectFields = (chain: IChain) => chain(wordChain, optional(',', selectFie
 
 // groupBy ---------------------------------------
 
-const groupByItems = (chain: IChain) => chain(expression, optional(',', groupByItems))();
+const groupByStatement = (chain: IChain) => chain('group', 'by', fieldList)();
+
+// orderBy ---------------------------------------
+
+const orderByClause = (chain: IChain) => chain('order', 'by', fieldList)();
+
+const orderByExpressionList = (chain: IChain) => chain(orderByExpression, optional(',', orderByExpressionList))();
+
+const orderByExpression = (chain: IChain) => chain(expression, ['asc', 'desc'])();
+
+// limit -----------------------------------------
+
+const limitClause = (chain: IChain) =>
+  chain('limit', [numberChain, chain(numberChain, ',', numberChain)(), chain(numberChain, 'offset', numberChain)()])();
 
 // Function ---------------------------------------
 
-const functionChain = (chain: IChain) => chain([castFunction, normalFunction])();
+const functionChain = (chain: IChain) => chain([castFunction, normalFunction, ifFunction])();
 
 const functionFields = (chain: IChain) => chain(functionFieldItem, optional(',', functionFields))();
 
 const functionFieldItem = (chain: IChain) => chain(many(selectSpec), [field, caseStatement])();
 
 // TODO:
-const ifFunction = (chain: IChain) => chain()();
+const ifFunction = (chain: IChain) => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
 const castFunction = (chain: IChain) => chain('cast', '(', wordChain, 'as', dataType, ')')();
 
@@ -118,9 +158,10 @@ const normalFunction = (chain: IChain) => chain(wordChain, '(', optional(functio
 
 // Case -----------------------------------------
 
-const caseStatement = (chain: IChain) => chain('case', plus(caseAlternative), 'else', [stringChain, 'null'], 'end')();
+const caseStatement = (chain: IChain) =>
+  chain('case', plus(caseAlternative), optional('else', [stringChain, 'null']), 'end')();
 
-const caseAlternative = (chain: IChain) => chain('when', expression, 'then', stringOrWord)();
+const caseAlternative = (chain: IChain) => chain('when', expression, 'then', fieldItem)();
 
 // Utils -----------------------------------------
 
@@ -143,24 +184,35 @@ const expression = (chain: IChain) =>
     chain(predicate, [
       many(logicalOperator, expression),
       chain('is', optional('not'), ['true', 'fasle', 'unknown'])()
-    ])(),
-    chain('(', expression, ')')()
+    ])()
   ])(ast => ast[0]);
 
+// TODO: fix left recursion auto.
+// const predicate = (chain: IChain) =>
+//   chain([
+//     chain(predicate, [
+//       chain(optional('not'), 'in', '(', fieldList, ')')(),
+//       chain(comparisonOperator, field)(),
+//       chain(optional('not'), 'between', predicate, 'and', predicate)(),
+//       chain('like', stringChain)(),
+//       chain('is', nullNotnull)()
+//     ])(),
+//     chain('(', predicate, ')')(),
+//     field
+//   ])();
 const predicate = (chain: IChain) =>
-  chain([
-    chain(fieldList, [
+  chain(
+    [field, chain('(', predicate, ')')()],
+    many([
       chain(optional('not'), 'in', '(', fieldList, ')')(),
-      chain(comparisonOperator, field)(),
+      chain(comparisonOperator, predicate)(),
       chain(optional('not'), 'between', predicate, 'and', predicate)(),
-      chain('like', stringChain)()
-    ])(),
-    chain('(', predicate, ')')(),
-    field
-  ])();
+      chain('like', stringChain)(),
+      chain('is', nullNotnull)()
+    ])
+  )();
 
-const field = (chain: IChain) =>
-  chain(fieldItem, optional([chain('/', field)(), chain('+', field)(), chain('-', field)()]))();
+const nullNotnull = (chain: IChain) => chain(optional('not'), 'null')();
 
 const fieldItem = (chain: IChain) =>
   chain([
@@ -171,6 +223,8 @@ const fieldItem = (chain: IChain) =>
     stringOrWordOrNumber,
     '*'
   ])(ast => ast[0]);
+
+const field = createFourOperations(fieldItem);
 
 const wordChain = (chain: IChain) => chain(matchWord())(ast => ast[0]);
 

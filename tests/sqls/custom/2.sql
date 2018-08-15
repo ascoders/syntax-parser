@@ -1,6 +1,6 @@
 --Blink SQL
 --********************************************************************--
---Author: 黄晓锋
+--Author: 
 --CreateTime: 2018-07-06 16:09:04
 --Comment: lazada测试
 --********************************************************************--
@@ -90,7 +90,7 @@ FROM
           TO_TIMESTAMP(CAST(operate_time AS BIGINT)),
           'yyyy-MM-dd'
         )
-      ) >= DATE_SUB(CURRENT_TIMESTAMP, 2)
+      ) >= DATE_SUB(CURRENTTIMESTAMP, 2)
       AND action_type = '1'
       AND UPPER(action_code) IN ('DELIVERY_ORDER_CREATE')
     GROUP BY
@@ -184,7 +184,7 @@ FROM
                 '#3B',
                 ':'
               )
-            ) - 2
+            ) - '2'
           ),
           '\\},\\{',
           '\\},,,,\\{'
@@ -202,7 +202,7 @@ FROM
           TO_TIMESTAMP(CAST(gmt_create AS BIGINT)),
           'yyyy-MM-dd'
         )
-      ) >= DATE_SUB(CURRENT_TIMESTAMP, 7)
+      ) >= DATE_SUB(CURRENTTIMESTAMP, 7)
     GROUP BY
       trade_order_id,
       buyer_id,
@@ -332,247 +332,11 @@ SELECT
     ),
     (
       actual_fee + loyalty_discount_amount + store_credit_amount + giftcard_amount + discount_amount_by_platform
-    ) / 100
+    )
   ) AS actual_gmv,
-  IF(
-    venture = 'VN',
-    (
-      actual_fee + loyalty_discount_amount + store_credit_amount + giftcard_amount + discount_amount_by_platform
-    ) * to_usd,
-    (
-      actual_fee + loyalty_discount_amount + store_credit_amount + giftcard_amount + discount_amount_by_platform
-    ) * to_usd / 100
-  ) AS actual_gmv_usd,
+ 
   CONCAT(trade_order_id, asc_sku_id) AS order_id,
   CONCAT(trade_order_id, seller_id) AS mord_id,
   regional_category_key
 FROM
-  (
-    SELECT
-      a.venture,
-      b.stat_date,
-      b.stat_hour,
-      a.trade_order_line_id,
-      a.trade_order_id,
-      a.seller_id,
-      a.buyer_id,
-      a.asc_sku_id,
-      a.asc_item_id,
-      a.category_id,
-      a.seller_full_name,
-      a.buyer_full_name,
-      a.sku_info,
-      a.item_title,
-      a.quantity,
-      a.actual_fee,
-      a.actual_fee_currency_code,
-      a.features,
-      a.features_cc,
-      a.site_id,
-      c.features AS biz_features,
-      c.features_cc AS biz_features_cc,
-      c.site_id AS biz_site_id,
-      d.`type` AS `type`,
-      c.cookie_id,
-      c.anoymous_id,
-      c.adid,
-      c.utdid,
-      a.bob_simple_sku,
-      e.venture_category1_id,
-      e.venture_category1_name_en,
-      e.venture_category2_id,
-      e.venture_category2_name_en,
-      e.venture_category3_id,
-      e.venture_category3_name_en,
-      e.venture_category4_id,
-      e.venture_category4_name_en,
-      e.venture_category5_id,
-      e.venture_category5_name_en,
-      e.venture_category6_id,
-      e.venture_category6_name_en,
-      b.data_time,
-      d.client_type,
-      CAST(a.actual_fee AS DOUBLE) * CAST(f.to_usd AS DOUBLE) AS actual_fee_usd,
-      SPLIT_INDEX(d.ttid, '_', 2) AS app_version,
-      g.industry_id,
-      g.industry_name,
-      g.regional_category1_name,
-      g.regional_category2_name,
-      g.regional_category3_name,
-      h.business_type_level2,
-      a.shipping_actual_fee,
-      a.shipping_actual_fee_currency_code,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          0
-        ) AS DOUBLE
-      ) AS loyalty_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          1
-        ) AS DOUBLE
-      ) AS store_credit_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          2
-        ) AS DOUBLE
-      ) AS giftcard_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          3
-        ) AS DOUBLE
-      ) AS bundle_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          4
-        ) AS DOUBLE
-      ) AS voucher_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          5
-        ) AS DOUBLE
-      ) AS cart_rule_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          6
-        ) AS DOUBLE
-      ) AS cr_no_money_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          7
-        ) AS DOUBLE
-      ) AS loyalty_shipping_fee_discount_amount,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          8
-        ) AS DOUBLE
-      ) AS shipping_fee_discount_amount,
-      SPLIT_INDEX(
-        LZD_TRD_PARSER(
-          d.pminfo,
-          a.sale_discount_info_tmp,
-          a.shipping_discount_info_tmp
-        ),
-        '\u0001',
-        9
-      ) AS promotion_attributes,
-      SPLIT_INDEX(
-        LZD_TRD_PARSER(
-          d.pminfo,
-          a.sale_discount_info_tmp,
-          a.shipping_discount_info_tmp
-        ),
-        '\u0001',
-        10
-      ) AS spread_code,
-      CAST(
-        SPLIT_INDEX(
-          LZD_TRD_PARSER(
-            d.pminfo,
-            a.sale_discount_info_tmp,
-            a.shipping_discount_info_tmp
-          ),
-          '\u0001',
-          11
-        ) AS DOUBLE
-      ) AS discount_amount_by_platform,
-      CAST(f.to_usd AS DOUBLE) AS to_usd,
-      g.regional_category_key
-    FROM
-      trade_order_line_view a
-      JOIN trade_order_line_history_view b ON a.trade_order_line_id = b.trade_order_line_id
-      JOIN trade_order_biz_features_view c ON a.trade_order_id = c.trade_order_id
-      JOIN trade_order_view d ON a.trade_order_id = d.trade_order_id
-      LEFT OUTER JOIN dim_lzd_prd_category_tree_local FOR SYSTEM_TIME AS OF PROCTIME() AS e ON CASE
-        WHEN a.category_id IS NULL
-        OR a.category_id = '' THEN NULL
-        ELSE CONCAT(
-          SUBSTRING(MD5(a.category_id), 1, 4),
-          '\004',
-          a.category_id,
-          '\004',
-          a.site_id
-        )
-      END = e.rowkey
-      LEFT OUTER JOIN dim_lzd_exchange_rate FOR SYSTEM_TIME AS OF PROCTIME() AS f ON CASE
-        WHEN a.actual_fee_currency_code IS NULL
-        OR a.actual_fee_currency_code = '' THEN NULL
-        ELSE CONCAT(
-          SUBSTRING(MD5(a.actual_fee_currency_code), 1, 4),
-          '\004',
-          a.actual_fee_currency_code
-        )
-      END = f.rowkey
-      LEFT OUTER JOIN dim_lzd_prd_industry_category_ri FOR SYSTEM_TIME AS OF PROCTIME() AS g ON CASE
-        WHEN a.category_id IS NULL
-        OR a.category_id = '' THEN NULL
-        ELSE CONCAT(
-          SUBSTRING(MD5(a.category_id), 1, 4),
-          '\004',
-          a.category_id,
-          '\004',
-          a.site_id
-        )
-      END = g.rowkey
-      LEFT OUTER JOIN dim_lzd_slr_seller FOR SYSTEM_TIME AS OF PROCTIME() AS h ON CONCAT(
-        SUBSTRING(MD5(a.seller_id), 1, 4),
-        '\004',
-        a.seller_id,
-        '\004',
-        a.site_id
-      ) = h.rowkey
-  ) t;
+  t
