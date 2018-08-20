@@ -43,6 +43,7 @@ class VisiterOption {
   public onFail?: (lastNode?: Node) => void;
   public generateAst?: boolean = true;
   public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
+  public enableFirstSet?: boolean = true;
 }
 
 class MatchNode {
@@ -334,7 +335,7 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
     resetHeadByVersion(node, store);
 
     // If has first set, we can fail soon.
-    if (node.functionName && node.headIndex === 0 && firstSet.has(node.functionName)) {
+    if (visiterOption.enableFirstSet && node.functionName && node.headIndex === 0 && firstSet.has(node.functionName)) {
       const firstMatchNodes = firstSet.get(node.functionName);
 
       // If not match any first match node, set false
@@ -481,6 +482,7 @@ function findNextMatchNodes(node: Node): MatchNode[] {
 
   const visiterOption: VisiterOption = {
     generateAst: false,
+    enableFirstSet: false,
     onMatchNode: (matchNode, store, currentVisiterOption) => {
       if (matchNode.matching.type === 'loose' && matchNode.matching.value === true) {
         callParentNode(matchNode, store, currentVisiterOption, null);

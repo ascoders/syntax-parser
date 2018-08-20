@@ -64,7 +64,9 @@ function fromClause() {
 }
 
 function selectList() {
-  return chain(selectField, many(',', selectField))(binaryRecursionToArray);
+  return chain(selectField, many(',', selectField))(ast => {
+    return ast;
+  });
 }
 
 function whereStatement() {
