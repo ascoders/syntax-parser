@@ -1,17 +1,26 @@
-import { ChainNode, IChain, optional } from '../parser';
+import { Chain, chain, ChainNodeFactory, optional } from '../parser';
 
 // Four operations ---------------------------------
-export function createFourOperations(field: (chain: IChain) => ChainNode) {
-  const expr = (chain: IChain) => chain(term, exprTail)();
+export function createFourOperations(field: () => ChainNodeFactory) {
+  function expr() {
+    return chain(term, exprTail)();
+  }
 
-  const exprTail = (chain: IChain) => chain(optional([chain('+', term, exprTail)(), chain('-', term, exprTail)]))();
+  function exprTail() {
+    return chain(optional([chain('+', term, exprTail)(), chain('-', term, exprTail)]))();
+  }
 
-  const term = (chain: IChain) => chain(factor, termTail)();
+  function term() {
+    return chain(factor, termTail)();
+  }
 
-  const termTail = (chain: IChain) =>
-    chain(optional([chain('*', factor, termTail)(), chain('/', factor, termTail)()]))();
+  function termTail() {
+    return chain(optional([chain('*', factor, termTail)(), chain('/', factor, termTail)()]))();
+  }
 
-  const factor = (chain: IChain) => chain([chain('(', expr, ')')(), field])();
+  function factor() {
+    return chain([chain('(', expr, ')')(), field])();
+  }
 
   return expr;
 }

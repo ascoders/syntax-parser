@@ -1,9 +1,9 @@
 import { IToken } from '../lexer/token';
 import {
+  chain,
   ChainNode,
-  createChainNodeFactory,
+  ChainNodeFactory,
   execChain,
-  IChain,
   many,
   matchNumber,
   matchString,
@@ -19,17 +19,24 @@ const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
-const root = (chain: IChain) => chain(statements, optional(';'))(ast => ast[0]);
+function root() {
+  return chain(statements, optional(';'))(ast => ast[0]);
+}
 
-const statements = (chain: IChain) => chain(statement, optional(';', statements))(binaryRecursionToArray);
+function statements() {
+  return chain(statement, many(';', statement))(binaryRecursionToArray);
+}
 
-const statement = (chain: IChain) =>
-  chain([selectStatement, createTableStatement, insertStatement, createViewStatement])(ast => ast[0]);
+function statement() {
+  return chain([selectStatement, createTableStatement, insertStatement, createViewStatement, setStatement])(
+    ast => ast[0]
+  );
+}
 
 // select statement ----------------------------
 
-const selectStatement = (chain: IChain) =>
-  chain(
+function selectStatement() {
+  return chain(
     'select',
     selectList,
     fromClause,
@@ -46,128 +53,191 @@ const selectStatement = (chain: IChain) =>
 
     return result;
   });
+}
 
-const union = (chain: IChain) => chain('union', ['all', 'distinct'])();
+function union() {
+  return chain('union', ['all', 'distinct'])();
+}
 
-const fromClause = (chain: IChain) =>
-  chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
+function fromClause() {
+  return chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
+}
 
-// selectList ::= selectField ( , selectList )?
-const selectList = (chain: IChain) => chain(selectField, optional(',', selectList))(binaryRecursionToArray);
+function selectList() {
+  return chain(selectField, many(',', selectField))(binaryRecursionToArray);
+}
 
-// whereStatement ::= WHERE expression
-const whereStatement = (chain: IChain) => chain('where', expression)(ast => ast[1]);
+function whereStatement() {
+  return chain('where', expression)(ast => ast[1]);
+}
 
 // selectField
 //         ::= not? field alias?
 //         ::= not? ( field ) alias?
 //           | caseStatement alias?
 //           | *
-const selectField = (chain: IChain) =>
-  chain([
-    chain([chain(many('not'), field)(), chain(many('not'), '(', field, ')')()], optional(alias))(),
-    chain(caseStatement, optional(alias))(),
+function selectField() {
+  return chain([
+    chain([chain(many('not'), field)(), chain(many('not'), '(', field, ')')(), caseStatement], optional(alias))(),
     '*'
   ])();
+}
 
 // fieldList
 //       ::= field (, fieldList)?
-const fieldList = (chain: IChain) => chain(field, optional(',', fieldList))();
+function fieldList() {
+  return chain(field, many(',', field))();
+}
 
-const tableSources = (chain: IChain) => chain(tableSource, optional(',', tableSources))();
+function tableSources() {
+  return chain(tableSource, many(',', tableSource))();
+}
 
-const tableSource = (chain: IChain) =>
-  chain(
+function tableSource() {
+  return chain(
     [chain(tableSourceItem, many(joinPart))(), chain('(', tableSourceItem, many(joinPart), ')')()],
     optional(alias)
   )();
+}
 
-const tableSourceItem = (chain: IChain) =>
-  chain([
+function tableSourceItem() {
+  return chain([
     chain(tableName, optional(alias))(),
     chain([selectStatement, chain('(', selectStatement, ')')()], optional(alias))(),
     chain('(', tableSources, ')')()
   ])();
+}
 
-const joinPart = (chain: IChain) =>
-  chain([
+function joinPart() {
+  return chain([
     chain(['inner', 'cross'], 'join', tableSourceItem, optional('on', expression))(),
     chain('straight_join', tableSourceItem, optional('on', expression))(),
     chain(['left', 'right'], optional('outer'), 'join', tableSourceItem, optional('on', expression))(),
     chain('natural', optional(['left', 'right'], optional('outer')), 'join', tableSourceItem)()
   ])();
+}
 
 // Alias ::= AS WordOrString
 //         | WordOrString
-const alias = (chain: IChain) => chain([chain('as', stringOrWord)(), stringOrWord])();
+function alias() {
+  return chain([chain('as', stringOrWord)(), stringOrWord])();
+}
 
 // Create table statement ----------------------------
+function createTableStatement() {
+  return chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
+}
 
-const createTableStatement = (chain: IChain) => chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
+function tableOptions() {
+  return chain(tableOption, many(',', tableOption))();
+}
 
-const tableOptions = (chain: IChain) => chain(tableOption, optional(',', tableOptions))();
+function tableOption() {
+  return chain(stringOrWord, dataType)();
+}
 
-const tableOption = (chain: IChain) => chain(stringOrWord, dataType)();
-
-const tableName = (chain: IChain) => chain([wordChain, chain(wordChain, '.', wordChain)()])();
+function tableName() {
+  return chain([wordChain, chain(wordChain, '.', wordChain)()])();
+}
 
 // Create view statement ----------------------------
-
-const createViewStatement = (chain: IChain) => chain('create', 'view', wordChain, 'as', selectStatement)();
+function createViewStatement() {
+  return chain('create', 'view', wordChain, 'as', selectStatement)();
+}
 
 // Insert statement ----------------------------
+function insertStatement() {
+  return chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
+}
 
-const insertStatement = (chain: IChain) =>
-  chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
+function selectFieldsInfo() {
+  return chain('(', selectFields, ')')();
+}
 
-const selectFieldsInfo = (chain: IChain) => chain('(', selectFields, ')')();
-
-const selectFields = (chain: IChain) => chain(wordChain, optional(',', selectFields))();
+function selectFields() {
+  return chain(wordChain, many(',', wordChain))();
+}
 
 // groupBy ---------------------------------------
-
-const groupByStatement = (chain: IChain) => chain('group', 'by', fieldList)();
+function groupByStatement() {
+  return chain('group', 'by', fieldList)();
+}
 
 // orderBy ---------------------------------------
+function orderByClause() {
+  return chain('order', 'by', fieldList)();
+}
 
-const orderByClause = (chain: IChain) => chain('order', 'by', fieldList)();
+function orderByExpressionList() {
+  return chain(orderByExpression, optional(',', orderByExpressionList))();
+}
 
-const orderByExpressionList = (chain: IChain) => chain(orderByExpression, optional(',', orderByExpressionList))();
-
-const orderByExpression = (chain: IChain) => chain(expression, ['asc', 'desc'])();
+function orderByExpression() {
+  return chain(expression, ['asc', 'desc'])();
+}
 
 // limit -----------------------------------------
-
-const limitClause = (chain: IChain) =>
-  chain('limit', [numberChain, chain(numberChain, ',', numberChain)(), chain(numberChain, 'offset', numberChain)()])();
+function limitClause() {
+  return chain('limit', [
+    numberChain,
+    chain(numberChain, ',', numberChain)(),
+    chain(numberChain, 'offset', numberChain)()
+  ])();
+}
 
 // Function ---------------------------------------
+function functionChain() {
+  return chain([castFunction, normalFunction, ifFunction])();
+}
 
-const functionChain = (chain: IChain) => chain([castFunction, normalFunction, ifFunction])();
+function functionFields() {
+  return chain(functionFieldItem, many(',', functionFieldItem))();
+}
 
-const functionFields = (chain: IChain) => chain(functionFieldItem, optional(',', functionFields))();
+function functionFieldItem() {
+  return chain(many(selectSpec), [field, caseStatement])();
+}
 
-const functionFieldItem = (chain: IChain) => chain(many(selectSpec), [field, caseStatement])();
+function ifFunction() {
+  return chain('if', '(', predicate, ',', field, ',', field, ')')();
+}
 
-// TODO:
-const ifFunction = (chain: IChain) => chain('if', '(', predicate, ',', field, ',', field, ')')();
+function castFunction() {
+  return chain('cast', '(', wordChain, 'as', dataType, ')')();
+}
 
-const castFunction = (chain: IChain) => chain('cast', '(', wordChain, 'as', dataType, ')')();
-
-const normalFunction = (chain: IChain) => chain(wordChain, '(', optional(functionFields), ')')();
+function normalFunction() {
+  return chain(wordChain, '(', optional(functionFields), ')')();
+}
 
 // Case -----------------------------------------
+function caseStatement() {
+  return chain('case', plus(caseAlternative), optional('else', [stringChain, 'null']), 'end')();
+}
 
-const caseStatement = (chain: IChain) =>
-  chain('case', plus(caseAlternative), optional('else', [stringChain, 'null']), 'end')();
+function caseAlternative() {
+  return chain('when', expression, 'then', fieldItem)();
+}
 
-const caseAlternative = (chain: IChain) => chain('when', expression, 'then', fieldItem)();
+// set statement ----------------------------
+
+function setStatement() {
+  return chain('set', [variableAssignments])();
+}
+
+function variableAssignments() {
+  return chain(variableAssignment, many(',', variableAssignment))();
+}
+
+function variableAssignment() {
+  return chain(fieldItem, '=', [fieldItem, 'true'])();
+}
 
 // Utils -----------------------------------------
 
 // TODO: https://github.com/antlr/grammars-v4/blob/master/mysql/MySqlParser.g4#L1963
-const dataType = (chain: IChain) =>
-  chain([
+function dataType() {
+  return chain([
     chain(['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext']),
     chain(['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint']),
     chain(['real', 'double', 'float']),
@@ -177,15 +247,17 @@ const dataType = (chain: IChain) =>
     chain(['enum', 'set']),
     chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')
   ])(ast => ast[0]);
+}
 
-const expression = (chain: IChain) =>
-  chain([
+function expression(): ChainNodeFactory {
+  return chain([
     chain(notOperator, [expression, chain('(', expression, ')')()])(),
     chain(predicate, [
       many(logicalOperator, expression),
       chain('is', optional('not'), ['true', 'fasle', 'unknown'])()
     ])()
   ])(ast => ast[0]);
+}
 
 // TODO: fix left recursion auto.
 // const predicate = (chain: IChain) =>
@@ -200,8 +272,8 @@ const expression = (chain: IChain) =>
 //     chain('(', predicate, ')')(),
 //     field
 //   ])();
-const predicate = (chain: IChain) =>
-  chain(
+function predicate() {
+  return chain(
     [field, chain('(', predicate, ')')()],
     many([
       chain(optional('not'), 'in', '(', fieldList, ')')(),
@@ -211,39 +283,58 @@ const predicate = (chain: IChain) =>
       chain('is', nullNotnull)()
     ])
   )();
+}
 
-const nullNotnull = (chain: IChain) => chain(optional('not'), 'null')();
+function nullNotnull() {
+  return chain(optional('not'), 'null')();
+}
 
-const fieldItem = (chain: IChain) =>
-  chain([
+function fieldItem() {
+  return chain([
     functionChain,
-    numberChain,
-    chain(stringOrWordOrNumber, '.', '*')(),
-    chain(stringOrWordOrNumber, '.', stringOrWordOrNumber)(),
-    stringOrWordOrNumber,
+    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(),
     '*'
   ])(ast => ast[0]);
+}
 
-const field = createFourOperations(fieldItem);
+function field() {
+  return createFourOperations(fieldItem)();
+}
 
-const wordChain = (chain: IChain) => chain(matchWord())(ast => ast[0]);
+function wordChain() {
+  return chain(matchWord())(ast => ast[0]);
+}
 
-const stringChain = (chain: IChain) => chain(matchString())(ast => ast[0]);
+function stringChain() {
+  return chain(matchString())(ast => ast[0]);
+}
 
-const numberChain = (chain: IChain) => chain(matchNumber())(ast => ast[0]);
+function numberChain() {
+  return chain(matchNumber())(ast => ast[0]);
+}
 
-const stringOrWord = (chain: IChain) => chain([wordChain, stringChain])(ast => ast[0]);
+function stringOrWord() {
+  return chain([wordChain, stringChain])(ast => ast[0]);
+}
 
-const stringOrWordOrNumber = (chain: IChain) => chain([wordChain, stringChain, numberChain])(ast => ast[0]);
+function stringOrWordOrNumber() {
+  return chain([wordChain, stringChain, numberChain])(ast => ast[0]);
+}
 
-const logicalOperator = (chain: IChain) => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
+function logicalOperator() {
+  return chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
+}
 
-const comparisonOperator = (chain: IChain) => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
+function comparisonOperator() {
+  return chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
+}
 
-const notOperator = (chain: IChain) => chain(['not', '!'])(ast => ast[0]);
+function notOperator() {
+  return chain(['not', '!'])(ast => ast[0]);
+}
 
-const selectSpec = (chain: IChain) =>
-  chain([
+function selectSpec() {
+  return chain([
     'all',
     'distinct',
     'distinctrow',
@@ -256,13 +347,13 @@ const selectSpec = (chain: IChain) =>
     'sql_no_cache',
     'sql_calc_found_rows'
   ])(ast => ast[0]);
+}
 
 export class SQLAstParser {
   public rootChainNode: ChainNode;
 
   constructor() {
-    const chainNodeFactory = createChainNodeFactory();
-    this.rootChainNode = chainNodeFactory(root)();
+    this.rootChainNode = root()();
   }
 
   public parse = (tokens: IToken[], cursorPosition = 0) => {

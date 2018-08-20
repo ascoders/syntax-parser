@@ -1,4 +1,6 @@
 {
+  "name": "smart-chain",
+  "version": "1.0.0",
   "pri": {
     "type": "component"
   },

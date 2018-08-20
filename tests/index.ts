@@ -1,7 +1,7 @@
 import test from 'ava';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SQLAstParser, tokenConfig, Tokenizer } from '../src';
+import { SQLAstParser, tokenConfig, Tokenizer } from '../src/sql';
 
 const sqlTests: Array<{
   groupName: string;

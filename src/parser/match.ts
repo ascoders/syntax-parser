@@ -1,6 +1,6 @@
 import { IToken } from '../lexer/token';
 import tokenTypes from '../lexer/token-types';
-import { IChain } from './chain';
+import { chain } from './chain';
 import { Scanner } from './scanner';
 
 export interface IMatch {
@@ -16,7 +16,7 @@ function equalWordOrIncludeWords(str: string, word: string | string[]) {
   }
 }
 
-function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMatch {
+function matchToken(scanner: Scanner, compare: (token: IToken) => boolean, isCostToken?: boolean): IMatch {
   const token = scanner.read();
   if (!token) {
     return {
@@ -25,7 +25,10 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMat
     };
   }
   if (compare(token)) {
-    scanner.next();
+    if (isCostToken) {
+      scanner.next();
+    }
+
     return {
       token,
       match: true
@@ -38,10 +41,10 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean): IMat
   }
 }
 
-function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch, specialName?: string) {
+function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) => IMatch, specialName?: string) {
   return (arg?: T) => {
     function foo() {
-      return (scanner: Scanner) => fn(scanner, arg);
+      return (scanner: Scanner, isCostToken?: boolean) => fn(scanner, arg, isCostToken);
     }
     foo.prototype.name = 'match';
     foo.prototype.displayName = specialName;
@@ -49,30 +52,34 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T) => IMatch, specialName?:
   };
 }
 
-export const match = createMatch((scanner, word: string | string[]) =>
-  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word))
+export const match = createMatch((scanner, word: string | string[], isCostToken) =>
+  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
 );
 
-export const matchWord = createMatch((scanner, word?: string | string[]) => {
+export const matchWord = createMatch((scanner, word: string | string[], isCostToken) => {
   if (!word) {
-    return matchToken(scanner, token => token.type === tokenTypes.WORD);
+    return matchToken(scanner, token => token.type === tokenTypes.WORD, isCostToken);
   } else {
-    return matchToken(scanner, token => token.type === tokenTypes.WORD && equalWordOrIncludeWords(token.value, word));
+    return matchToken(
+      scanner,
+      token => token.type === tokenTypes.WORD && equalWordOrIncludeWords(token.value, word),
+      isCostToken
+    );
   }
 }, 'word');
 
 export const matchString = createMatch(
-  scanner => matchToken(scanner, token => token.type === tokenTypes.STRING),
+  (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.STRING, isCostToken),
   'string'
 );
 
 export const matchNumber = createMatch(
-  scanner => matchToken(scanner, token => token.type === tokenTypes.NUMBER),
+  (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.NUMBER, isCostToken),
   'number'
 );
 
-export const matchWordOrString = createMatch(scanner =>
-  matchToken(scanner, token => token.type === tokenTypes.WORD || token.type === tokenTypes.STRING)
+export const matchWordOrString = createMatch((scanner, compare, isCostToken) =>
+  matchToken(scanner, token => token.type === tokenTypes.WORD || token.type === tokenTypes.STRING, isCostToken)
 );
 
 export const matchTrue = (): IMatch => ({
@@ -84,12 +91,16 @@ export const matchFalse = (): IMatch => ({
   match: true
 });
 
-export const optional = (...elements: any[]) => (chain: IChain) => chain([chain(...elements)(), true])(ast => ast[0]);
+export function optional(...elements: any[]) {
+  return chain([chain(...elements)(), true])(ast => ast[0]);
+}
 
-export const plus = (...elements: any[]) => (chain: IChain) => {
+export function plus(...elements: any[]) {
   const result = chain(...elements)();
-  result.isPlus = true;
+  (result as any).prototype.isPlus = true;
   return result;
-};
+}
 
-export const many = (...elements: any[]) => optional(plus(...elements));
+export function many(...elements: any[]) {
+  return optional(plus(...elements));
+}

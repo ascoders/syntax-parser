@@ -4,6 +4,13 @@ import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 import { tailCallOptimize } from './utils';
 
+type FirstOrFunctionSet = MatchNode | string;
+
+// First set
+const firstSet = new Map<string, MatchNode[]>();
+const firstOrFunctionSet = new Map<string, FirstOrFunctionSet[]>();
+const relatedSet = new Map<string, Set<string>>();
+
 let globalVersion = 0;
 
 function getNewVersion() {
@@ -12,7 +19,7 @@ function getNewVersion() {
 
 // tslint:disable:max-classes-per-file
 
-export type IMatchFn = (scanner: Scanner) => IMatch;
+export type IMatchFn = (scanner: Scanner, isCostToken: boolean) => IMatch;
 
 // IToken | Array<IToken> | any return object from resolveAst().
 export type IAst = IToken | any;
@@ -35,19 +42,7 @@ class VisiterOption {
   public onSuccess?: () => void;
   public onFail?: (lastNode?: Node) => void;
   public generateAst?: boolean = true;
-  public onMatchNode?: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void = (
-    matchNode,
-    store,
-    visiterOption
-  ) => {
-    const matchResult = matchNode.run(store.scanner);
-
-    if (!matchResult.match) {
-      tryChances(matchNode, store, visiterOption);
-    } else {
-      callParentNode(matchNode, store, visiterOption, matchResult.token);
-    }
-  };
+  public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
 }
 
 class MatchNode {
@@ -55,17 +50,19 @@ class MatchNode {
 
   constructor(private matchFunction: IMatchFn, public matching: IMatching, public parentIndex: number) {}
 
-  public run = (scanner: Scanner) => this.matchFunction(scanner);
+  public run = (scanner: Scanner, isCostToken = true) => this.matchFunction(scanner, isCostToken);
 }
 
 export class FunctionNode {
   public parentNode: ParentNode;
 
-  constructor(private chainFunction: FunctionElement, public parentIndex: number) {}
+  constructor(private chainFunction: ChainFunction, public parentIndex: number) {}
 
   public run = () => {
-    return this.chainFunction(createChainNodeFactory(this.parentNode, this.chainFunction.name, this.parentIndex));
+    return this.chainFunction()(this.parentNode, this.getFunctionName(), this.parentIndex);
   };
+
+  public getFunctionName = () => this.chainFunction.name;
 }
 
 class TreeNode {
@@ -104,21 +101,23 @@ type SingleElement = string | any;
 type IElement = SingleElement | SingleElement[];
 type IElements = IElement[];
 type ISolveAst = (astResult: IAst[]) => IAst;
-export type IChain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNode;
-type FunctionElement = (chain: IChain) => ChainNode;
 
-const createNodeByElement = (
-  element: IElement,
-  parentNode: ParentNode,
-  functionName: string,
-  parentIndex: number
-): Node => {
+export type Chain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNodeFactory;
+
+export type ChainNodeFactory = (
+  parentNode?: ParentNode,
+  // If parent node is a function, here will get it's name.
+  functionName?: string,
+  parentIndex?: number
+) => ChainNode;
+
+export type ChainFunction = () => ChainNodeFactory;
+
+const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIndex: number): Node => {
   if (element instanceof Array) {
     const treeNode = new TreeNode(parentIndex);
     treeNode.parentNode = parentNode;
-    treeNode.childs = element.map((eachElement, childIndex) =>
-      createNodeByElement(eachElement, treeNode, functionName, childIndex)
-    );
+    treeNode.childs = element.map((eachElement, childIndex) => createNodeByElement(eachElement, treeNode, childIndex));
     return treeNode;
   } else if (typeof element === 'string') {
     const matchNode = new MatchNode(
@@ -155,13 +154,6 @@ const createNodeByElement = (
       falseMatchNode.parentNode = parentNode;
       return falseMatchNode;
     }
-    // TODO: ChainNode 不要立刻执行，要在这里最终执行，否则已经初始化的信息可能不准确。
-  } else if (element instanceof ChainNode) {
-    element.parentNode = parentNode;
-    element.functionName = functionName;
-    element.parentIndex = parentIndex;
-    // element.parentNode.childs[parentIndex] = element;
-    return element;
   } else if (typeof element === 'function') {
     if (element.prototype.name === 'match') {
       const matchNode = new MatchNode(
@@ -174,8 +166,14 @@ const createNodeByElement = (
       );
       matchNode.parentNode = parentNode;
       return matchNode;
+    } else if (element.prototype.name === 'chainNodeFactory') {
+      const chainNode = element(parentNode, null, parentIndex);
+      if (element.prototype.isPlus) {
+        chainNode.isPlus = true;
+      }
+      return chainNode;
     } else {
-      const functionNode = new FunctionNode(element as FunctionElement, parentIndex);
+      const functionNode = new FunctionNode(element as ChainFunction, parentIndex);
       functionNode.parentNode = parentNode;
       return functionNode;
     }
@@ -184,22 +182,26 @@ const createNodeByElement = (
   }
 };
 
-export const createChainNodeFactory = (
-  parentNode?: ParentNode,
-  // If parent node is a function, here will get it's name.
-  functionName?: string,
-  parentIndex = 0
-) => (...elements: IElements) => (solveAst: ISolveAst = args => args): ChainNode => {
-  const chainNode = new ChainNode(parentIndex);
-  chainNode.parentNode = parentNode;
-  chainNode.functionName = functionName;
-  chainNode.solveAst = solveAst;
+export const chain: Chain = (...elements) => (solveAst = args => args) => {
+  const chainNodeFactory: ChainNodeFactory = (parentNode, functionName, parentIndex = 0) => {
+    const chainNode = new ChainNode(parentIndex);
+    chainNode.parentNode = parentNode;
+    chainNode.functionName = functionName;
+    chainNode.solveAst = solveAst;
 
-  elements = solveDirectLeftRecursion(elements, functionName);
+    elements = solveDirectLeftRecursion(elements, functionName);
 
-  chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, functionName, index));
+    chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, index));
 
-  return chainNode;
+    if (functionName) {
+      generateFirstSet(chainNode);
+    }
+
+    return chainNode;
+  };
+  chainNodeFactory.prototype.name = 'chainNodeFactory';
+
+  return chainNodeFactory;
 };
 
 /**
@@ -272,11 +274,13 @@ export const execChain = (
       ast = solveAst(chainNode.astResults);
     },
     onMatchNode: (matchNode, store, currentVisiterOption) => {
-      const matchResult = matchNode.run(scanner);
+      const matchResult = matchNode.run(store.scanner);
 
       if (!matchResult.match) {
+        // console.log('xxxxxxx', matchResult.token && matchResult.token.value, matchNode.matching);
         tryChances(matchNode, store, currentVisiterOption);
       } else {
+        // console.log('ooooooo', matchResult.token && matchResult.token.value, matchNode.matching);
         // If cursor prev token isn't null, it may a cursor prev node.
         if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
           cursorPrevNodes.push(matchNode);
@@ -328,6 +332,21 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
 
   if (node instanceof ChainNode) {
     resetHeadByVersion(node, store);
+
+    // If has first set, we can fail soon.
+    if (node.functionName && node.headIndex === 0 && firstSet.has(node.functionName)) {
+      const firstMatchNodes = firstSet.get(node.functionName);
+
+      // If not match any first match node, set false
+      if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
+        node.headIndex = node.childs.length;
+
+        tryChances(node, store, visiterOption);
+        return;
+      } else {
+        // first set success
+      }
+    }
 
     const nextChild = node.childs[node.headIndex];
     if (nextChild) {
@@ -388,7 +407,8 @@ const callParentNode = tailCallOptimize(
       }
 
       // If current node has isPlus, and run into callParentNode means it childs had match successful, so add a new chance.
-      if (node.parentNode.isPlus) {
+      if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
+        // console.log('!!!!!!!!call parent plus, add chance', node.parentNode);
         store.restChances.push({
           node: node.parentNode,
           headIndex: 0,
@@ -429,6 +449,9 @@ function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOptio
 
   // reset parent node's index
   recentChance.node.version = store.version;
+
+  // console.log('tryChances', recentChance.node, recentChance.tokenIndex, recentChance.headIndex);
+
   resetParentsHeadIndexAndVersion(recentChance.node, store.version);
 
   visiter(recentChance.node, store, visiterOption);
@@ -477,4 +500,96 @@ function findNextMatchNodes(node: Node): MatchNode[] {
   }
 
   return nextMatchNodes;
+}
+
+function generateFirstSet(node: ChainNode) {
+  const functionName = node.functionName;
+
+  if (firstSet.has(functionName)) {
+    return;
+  }
+
+  const firstMatchNodes = getFirstOrFunctionSet(node, functionName);
+  firstOrFunctionSet.set(functionName, firstMatchNodes);
+
+  solveFirstSet(functionName);
+
+  return firstMatchNodes;
+}
+
+function getFirstOrFunctionSet(node: Node, functionName: string): FirstOrFunctionSet[] {
+  if (node instanceof ChainNode) {
+    if (node.childs[0]) {
+      return getFirstOrFunctionSet(node.childs[0], functionName);
+    }
+  } else if (node instanceof TreeNode) {
+    return node.childs.reduce((all, next) => all.concat(getFirstOrFunctionSet(next, functionName)), []);
+  } else if (node instanceof MatchNode) {
+    return [node];
+  } else if (node instanceof FunctionNode) {
+    const relatedFunctionName = node.getFunctionName();
+
+    if (relatedSet.has(relatedFunctionName)) {
+      relatedSet.get(relatedFunctionName).add(functionName);
+    } else {
+      relatedSet.set(relatedFunctionName, new Set([functionName]));
+    }
+
+    return [relatedFunctionName];
+  } else {
+    throw Error('Unexpected node: ' + node);
+  }
+}
+
+function solveFirstSet(functionName: string) {
+  if (firstSet.has(functionName)) {
+    return;
+  }
+
+  const firstMatchNodes = firstOrFunctionSet.get(functionName);
+
+  // Try if relate functionName has done first set.
+  const newFirstMatchNodes = firstMatchNodes.reduce(
+    (all, firstMatchNode) => {
+      if (typeof firstMatchNode === 'string') {
+        if (firstSet.has(firstMatchNode)) {
+          all = all.concat(firstSet.get(firstMatchNode));
+        } else {
+          all.push(firstMatchNode);
+        }
+      } else {
+        all.push(firstMatchNode);
+      }
+
+      return all;
+    },
+    [] as FirstOrFunctionSet[]
+  );
+
+  firstOrFunctionSet.set(functionName, newFirstMatchNodes);
+
+  // If all set hasn't function node, we can solve it's relative set.
+  if (newFirstMatchNodes.every(firstMatchNode => firstMatchNode instanceof MatchNode)) {
+    firstSet.set(functionName, newFirstMatchNodes as MatchNode[]);
+
+    // If this functionName has related functionNames, solve them
+    if (relatedSet.has(functionName)) {
+      const relatedFunctionNames = relatedSet.get(functionName);
+      relatedFunctionNames.forEach(relatedFunctionName => solveFirstSet);
+    }
+  }
+}
+
+function findParentFunctionName(parentNode: ParentNode): string {
+  if (!parentNode) {
+    return null;
+  }
+
+  if (parentNode instanceof ChainNode) {
+    return parentNode.functionName;
+  } else if (parentNode instanceof TreeNode) {
+    return findParentFunctionName(parentNode.parentNode);
+  } else {
+    throw Error('Unexpected node: ' + parentNode);
+  }
 }
