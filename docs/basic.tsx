@@ -28,7 +28,9 @@ function parse(str: string) {
   }
 }
 
-parse(`select a from table`);
+parse(`
+select a
+`);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();
