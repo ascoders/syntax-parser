@@ -29,7 +29,7 @@ function parse(str: string) {
 }
 
 parse(`
-select a
+select a, b, c, d, e, f from aaa;
 `);
 
 export default class Page extends React.PureComponent<Props, State> {

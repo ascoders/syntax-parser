@@ -95,13 +95,15 @@ export class ChainNode {
   // Enable match plus times.
   public isPlus = false;
 
+  public plusHeadIndex = 0;
+
   constructor(public parentIndex: number) {}
 }
 
 type SingleElement = string | any;
 type IElement = SingleElement | SingleElement[];
 type IElements = IElement[];
-type ISolveAst = (astResult: IAst[]) => IAst;
+export type ISolveAst = (astResult: IAst[]) => IAst;
 
 export type Chain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNodeFactory;
 
@@ -404,12 +406,21 @@ const callParentNode = tailCallOptimize(
 
     if (node.parentNode instanceof ChainNode) {
       if (visiterOption.generateAst) {
-        node.parentNode.astResults[node.parentIndex] = astValue;
+        if (node.parentNode.isPlus) {
+          if (!node.parentNode.astResults[node.parentNode.plusHeadIndex]) {
+            node.parentNode.astResults[node.parentNode.plusHeadIndex] = [];
+          }
+          node.parentNode.astResults[node.parentNode.plusHeadIndex][node.parentIndex] = astValue;
+        } else {
+          node.parentNode.astResults[node.parentIndex] = astValue;
+        }
       }
 
       // If current node has isPlus, and run into callParentNode means it childs had match successful, so add a new chance.
+      // TODO: ast has bug.
       if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
         // console.log('!!!!!!!!call parent plus, add chance', node.parentNode);
+        node.parentNode.plusHeadIndex++;
         store.restChances.push({
           node: node.parentNode,
           headIndex: 0,

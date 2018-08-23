@@ -1,6 +1,6 @@
 import { IToken } from '../lexer/token';
 import tokenTypes from '../lexer/token-types';
-import { chain } from './chain';
+import { chain, ISolveAst } from './chain';
 import { Scanner } from './scanner';
 
 export interface IMatch {
@@ -101,6 +101,10 @@ export function plus(...elements: any[]) {
   return result;
 }
 
+export function optionalOneElement(element: any) {
+  return chain([chain(element)(ast => ast[0]), true])(ast => ast[0]);
+}
+
 export function many(...elements: any[]) {
-  return optional(plus(...elements));
+  return optionalOneElement(plus(...elements));
 }

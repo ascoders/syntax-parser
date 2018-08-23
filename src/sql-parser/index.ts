@@ -294,7 +294,7 @@ function nullNotnull() {
 function fieldItem() {
   return chain([
     functionChain,
-    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(),
+    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(ast => ast[0]),
     '*'
   ])(ast => ast[0]);
 }
