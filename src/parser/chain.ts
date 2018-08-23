@@ -332,7 +332,6 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
 
   if (node instanceof ChainNode) {
     resetHeadByVersion(node, store);
-
     // If has first set, we can fail soon.
     if (node.functionName && node.headIndex === 0 && firstSet.has(node.functionName)) {
       const firstMatchNodes = firstSet.get(node.functionName);
@@ -368,7 +367,6 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
         headIndex: node.headIndex + 1
       });
     }
-
     if (nextChild) {
       node.headIndex++;
       visiter(nextChild, store, visiterOption);
@@ -403,7 +401,15 @@ const callParentNode = tailCallOptimize(
 
     if (node.parentNode instanceof ChainNode) {
       if (visiterOption.generateAst) {
-        node.parentNode.astResults[node.parentIndex] = astValue;
+        if (node.parentNode.isPlus) {
+          if (node.parentNode.headIndex === 1) {
+            // TODO: 不用push，用具体下标，因为可能有回溯，回溯的时候用push可能导致结果不准确
+            node.parentNode.astResults.push([]);
+          }
+          node.parentNode.astResults[node.parentNode.astResults.length - 1][node.parentIndex] = astValue;
+        } else {
+          node.parentNode.astResults[node.parentIndex] = astValue;
+        }
       }
 
       // If current node has isPlus, and run into callParentNode means it childs had match successful, so add a new chance.
@@ -462,17 +468,33 @@ function resetHeadByVersion(node: ParentNode, store: VisiterStore) {
     // If version not equal, reset headIndex
     node.version = store.version;
     node.headIndex = 0;
+    // 清空astResults
+    if (node instanceof ChainNode) {
+      node.astResults = [];
+    }
   }
 }
 
+// chain(mulExp, many(mulOp, mulExp)), 假设现在在many里面的mulExp里面，那么此时其实是可以回到many的第一个节点mulOp的，这里是直接移到后面去了应该
 const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: number) => {
   if (node.parentNode) {
     node.parentNode.headIndex = node.parentIndex + 1;
+
+    // nextMatching
+    // if (node.parentNode instanceof ChainNode) {
+    //   // tslint:disable-next-line:no-console
+    //   // console.log('111', node.parentNode.isPlus);
+    //   if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
+    //     console.log('lalala', node);
+    //     node.parentNode.headIndex = 0;
+    //   }
+    // }
     node.parentNode.version = version;
     resetParentsHeadIndexAndVersion(node.parentNode, version);
   }
 });
 
+// find all tokens that may appear next
 function findNextMatchNodes(node: Node): MatchNode[] {
   const newVersion = getNewVersion();
   resetParentsHeadIndexAndVersion(node, newVersion);
