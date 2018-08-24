@@ -28,9 +28,9 @@ function parse(str: string) {
   }
 }
 
-parse(`
-select a
-`);
+parse(
+  'CREATE INDEX `bees`.`hive_state` ON `hive` (`happiness` ASC, `anger` DESC) WHERE  NOT `happiness` AND `anger` IS NOT 0'
+);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();

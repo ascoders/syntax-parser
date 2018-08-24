@@ -28,12 +28,17 @@ function statements() {
 }
 
 function statement() {
-  return chain([selectStatement, createTableStatement, insertStatement, createViewStatement, setStatement])(
-    ast => ast[0]
-  );
+  return chain([
+    selectStatement,
+    createTableStatement,
+    insertStatement,
+    createViewStatement,
+    setStatement,
+    indexStatement
+  ])(ast => ast[0]);
 }
 
-// select statement ----------------------------
+// ----------------------------------- select statement -----------------------------------
 
 function selectStatement() {
   return chain(
@@ -125,7 +130,7 @@ function alias() {
   return chain([chain('as', stringOrWord)(), stringOrWord])();
 }
 
-// Create table statement ----------------------------
+// ----------------------------------- Create table statement -----------------------------------
 function createTableStatement() {
   return chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
 }
@@ -142,12 +147,12 @@ function tableName() {
   return chain([wordChain, chain(wordChain, '.', wordChain)()])();
 }
 
-// Create view statement ----------------------------
+// ----------------------------------- Create view statement -----------------------------------
 function createViewStatement() {
   return chain('create', 'view', wordChain, 'as', selectStatement)();
 }
 
-// Insert statement ----------------------------
+// ----------------------------------- Insert statement -----------------------------------
 function insertStatement() {
   return chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
 }
@@ -160,12 +165,12 @@ function selectFields() {
   return chain(wordChain, many(',', wordChain))();
 }
 
-// groupBy ---------------------------------------
+// ----------------------------------- groupBy -----------------------------------
 function groupByStatement() {
   return chain('group', 'by', fieldList)();
 }
 
-// orderBy ---------------------------------------
+// ----------------------------------- orderBy -----------------------------------
 function orderByClause() {
   return chain('order', 'by', fieldList)();
 }
@@ -178,7 +183,7 @@ function orderByExpression() {
   return chain(expression, ['asc', 'desc'])();
 }
 
-// limit -----------------------------------------
+// ----------------------------------- limit -----------------------------------
 function limitClause() {
   return chain('limit', [
     numberChain,
@@ -187,7 +192,7 @@ function limitClause() {
   ])();
 }
 
-// Function ---------------------------------------
+// ----------------------------------- Function -----------------------------------
 function functionChain() {
   return chain([castFunction, normalFunction, ifFunction])();
 }
@@ -212,16 +217,16 @@ function normalFunction() {
   return chain(wordChain, '(', optional(functionFields), ')')();
 }
 
-// Case -----------------------------------------
+// ----------------------------------- Case -----------------------------------
 function caseStatement() {
-  return chain('case', plus(caseAlternative), optional('else', [stringChain, 'null']), 'end')();
+  return chain('case', plus(caseAlternative), optional('else', [stringChain, 'null', numberChain]), 'end')();
 }
 
 function caseAlternative() {
   return chain('when', expression, 'then', fieldItem)();
 }
 
-// set statement ----------------------------
+// ----------------------------------- set statement -----------------------------------
 
 function setStatement() {
   return chain('set', [variableAssignments])();
@@ -235,7 +240,7 @@ function variableAssignment() {
   return chain(fieldItem, '=', [fieldItem, 'true'])();
 }
 
-// Utils -----------------------------------------
+// ----------------------------------- Utils -----------------------------------
 
 // TODO: https://github.com/antlr/grammars-v4/blob/master/mysql/MySqlParser.g4#L1963
 function dataType() {
@@ -251,50 +256,88 @@ function dataType() {
   ])(ast => ast[0]);
 }
 
-function expression(): ChainNodeFactory {
-  return chain([
-    chain(notOperator, [expression, chain('(', expression, ')')()])(),
-    chain(predicate, [
-      many(logicalOperator, expression),
-      chain('is', optional('not'), ['true', 'fasle', 'unknown'])()
-    ])()
-  ])(ast => ast[0]);
+
+
+// ----------------------------------- Expression -----------------------------------
+
+/*
+ * expr:
+ *   expr OR expr
+ * | expr || expr
+ * | expr XOR expr
+ * | expr AND expr
+ * | expr && expr
+ * | NOT expr
+ * | ! expr
+ * | boolean_primary IS [NOT] {TRUE | FALSE | UNKNOWN}
+ * | boolean_primary 
+**/
+
+function expression() {
+  return chain(expressionHead, many(logicalOperator, expression))();
 }
 
-// TODO: fix left recursion auto.
-// const predicate = (chain: IChain) =>
-//   chain([
-//     chain(predicate, [
-//       chain(optional('not'), 'in', '(', fieldList, ')')(),
-//       chain(comparisonOperator, field)(),
-//       chain(optional('not'), 'between', predicate, 'and', predicate)(),
-//       chain('like', stringChain)(),
-//       chain('is', nullNotnull)()
-//     ])(),
-//     chain('(', predicate, ')')(),
-//     field
-//   ])();
-function predicate() {
+function expressionHead() {
+  return chain([
+    chain('(', expression, ')')(),
+    chain(notOperator, expression)(),
+    chain(booleanPrimary, optional(chain('is', optional('not'), ['true', 'false', 'unknown'])()))
+  ])();
+}
+
+/*
+ *boolean_primary:
+ *   boolean_primary IS [NOT] NULL
+ * | boolean_primary <=> predicate
+ * | boolean_primary comparison_operator predicate
+ * | boolean_primary comparison_operator {ALL | ANY} (subquery)
+ * | predicate
+**/
+function booleanPrimary() {
   return chain(
-    [field, chain('(', predicate, ')')()],
+    predicate,
     many([
-      chain(optional('not'), 'in', '(', fieldList, ')')(),
-      chain(comparisonOperator, predicate)(),
-      chain(optional('not'), 'between', predicate, 'and', predicate)(),
-      chain('like', stringChain)(),
-      chain('is', nullNotnull)()
+      'isnull',
+      chain(optional('is'), optional('not'), ['null', field])(),
+      chain(comparisonOperator, predicate)()
+      // chain(comparisonOperator, ['ALL',  'ANY'], (subquery))
     ])
   )();
 }
 
-function nullNotnull() {
-  return chain(optional('not'), 'null')();
+/*
+ * predicate:
+ *    field SOUNDS LIKE field
+ *  | field [NOT] IN (subquery)
+ *  | field [NOT] IN (expr [, expr] ...)
+ *  | field [NOT] BETWEEN field AND predicate
+ *  | field [NOT] LIKE simple_expr [ESCAPE simple_expr]
+ *  | field [NOT] REGEXP field
+ *  | field
+**/
+function predicate() {
+  return chain(
+    field,
+    optional([chain(comparisonOperator, [field, 'null'])(), chain('sounds', 'like', field)(), isOrNotExpression])
+  )();
+}
+
+function isOrNotExpression() {
+  return chain(optional('is'), optional('not'), [
+    chain('in', '(', fieldList, ')')(),
+    chain('between', field, 'and', predicate)(),
+    chain('like', field, optional('escape', field))(),
+    chain('regexp', field)()
+    // 'null',
+    // 'isnull',
+    // field
+  ])();
 }
 
 function fieldItem() {
   return chain([
     functionChain,
-    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(),
+    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(), // 字段
     '*'
   ])(ast => ast[0]);
 }
@@ -302,6 +345,31 @@ function fieldItem() {
 function field() {
   return createFourOperations(fieldItem)();
 }
+
+// ----------------------------------- create index expression -----------------------------------
+function indexStatement() {
+  return chain('CREATE', 'INDEX', indexItem, onStatement, whereStatement)();
+}
+
+// 所印象
+function indexItem() {
+  return chain(stringChain, many('.', stringChain))();
+}
+
+// on子表达式
+function onStatement() {
+  return chain('ON', stringChain, '(', fieldForIndexList, ')')();
+}
+
+function fieldForIndex() {
+  return chain(stringChain, optional(['ASC', 'DESC']))();
+}
+
+function fieldForIndexList() {
+  return chain(fieldForIndex, many(',', fieldForIndex))();
+}
+
+// ----------------------------------- Terminals -----------------------------------
 
 function wordChain() {
   return chain(matchWord())(ast => ast[0]);
@@ -323,10 +391,12 @@ function stringOrWordOrNumber() {
   return chain([wordChain, stringChain, numberChain])(ast => ast[0]);
 }
 
+// 逻辑运算式
 function logicalOperator() {
   return chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 }
 
+// 比较
 function comparisonOperator() {
   return chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 }
