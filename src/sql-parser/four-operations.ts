@@ -2,36 +2,19 @@ import { Chain, chain, ChainNodeFactory, optional } from '../parser';
 
 // Four operations ---------------------------------
 export function createFourOperations(field: () => ChainNodeFactory) {
+  const addExpr = () => chain(term, exprTail)();
 
+  const exprTail = () => chain(optional(chain(addOp, term, exprTail)()))();
 
-  // 四则运算
-  function addExpr() {
-    return chain(term, exprTail)();
-  }
+  const term = () => chain(factor, termTail)();
 
-  function exprTail() {
-    return chain(optional(chain(addOp, term, exprTail)()))();
-  }
+  const termTail = () => chain(optional(chain(mulOp, factor, termTail)()))();
 
-  function term() {
-    return chain(factor, termTail)();
-  }
+  const mulOp = () => chain(['*', '/', '%', 'MOD', 'DIV'])(ast => ast[0]);
 
-  function termTail() {
-    return chain(optional(chain(mulOp, factor, termTail)()))();
-  }
+  const addOp = () => chain(['+', '-'])(ast => ast[0]);
 
-  function mulOp() {
-    return chain(['*', '/', '%', 'MOD', 'DIV'])(ast => ast[0]);
-  }
-
-  function addOp() {
-    return chain(['+', '-'])(ast => ast[0]);
-  }
-
-  function factor() {
-    return chain([chain('(', addExpr, ')')(ast => ast[1]), field])(ast => ast[0]);
-  }
+  const factor = () => chain([chain('(', addExpr, ')')(ast => ast[1]), field])(ast => ast[0]);
 
   return addExpr;
 }

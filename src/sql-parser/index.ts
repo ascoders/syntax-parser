@@ -19,29 +19,19 @@ const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
 const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
-function root() {
-  return chain(statements, optional(';'))(ast => ast[0]);
-}
+const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
-function statements() {
-  return chain(statement, many(';', statement))(binaryRecursionToArray);
-}
+const statements = () => chain(statement, many(';', statement))(binaryRecursionToArray);
 
-function statement() {
-  return chain([
-    selectStatement,
-    createTableStatement,
-    insertStatement,
-    createViewStatement,
-    setStatement,
-    indexStatement
-  ])(ast => ast[0]);
-}
+const statement = () =>
+  chain([selectStatement, createTableStatement, insertStatement, createViewStatement, setStatement, indexStatement])(
+    ast => ast[0]
+  );
 
 // ----------------------------------- select statement -----------------------------------
 
-function selectStatement() {
-  return chain(
+const selectStatement = () =>
+  chain(
     'select',
     selectList,
     fromClause,
@@ -58,193 +48,126 @@ function selectStatement() {
 
     return result;
   });
-}
 
-function union() {
-  return chain('union', ['all', 'distinct'])();
-}
+const union = () => chain('union', ['all', 'distinct'])();
 
-function fromClause() {
-  return chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
-}
+const fromClause = () => chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
 
-function selectList() {
-  return chain(selectField, many(',', selectField))(ast => {
+const selectList = () =>
+  chain(selectField, many(',', selectField))(ast => {
     return ast;
   });
-}
 
-function whereStatement() {
-  return chain('where', expression)(ast => ast[1]);
-}
+const whereStatement = () => chain('where', expression)(ast => ast[1]);
 
 // selectField
 //         ::= not? field alias?
 //         ::= not? ( field ) alias?
 //           | caseStatement alias?
 //           | *
-function selectField() {
-  return chain([
+const selectField = () =>
+  chain([
     chain([chain(many('not'), field)(), chain(many('not'), '(', field, ')')(), caseStatement], optional(alias))(),
     '*'
   ])();
-}
 
 // fieldList
 //       ::= field (, fieldList)?
-function fieldList() {
-  return chain(field, many(',', field))();
-}
+const fieldList = () => chain(field, many(',', field))();
 
-function tableSources() {
-  return chain(tableSource, many(',', tableSource))();
-}
+const tableSources = () => chain(tableSource, many(',', tableSource))();
 
-function tableSource() {
-  return chain(
+const tableSource = () =>
+  chain(
     [chain(tableSourceItem, many(joinPart))(), chain('(', tableSourceItem, many(joinPart), ')')()],
     optional(alias)
   )();
-}
 
-function tableSourceItem() {
-  return chain([
+const tableSourceItem = () =>
+  chain([
     chain(tableName, optional(alias))(),
     chain([selectStatement, chain('(', selectStatement, ')')()], optional(alias))(),
     chain('(', tableSources, ')')()
   ])();
-}
 
-function joinPart() {
-  return chain([
+const joinPart = () =>
+  chain([
     chain(['inner', 'cross'], 'join', tableSourceItem, optional('on', expression))(),
     chain('straight_join', tableSourceItem, optional('on', expression))(),
     chain(['left', 'right'], optional('outer'), 'join', tableSourceItem, optional('on', expression))(),
     chain('natural', optional(['left', 'right'], optional('outer')), 'join', tableSourceItem)()
   ])();
-}
 
 // Alias ::= AS WordOrString
 //         | WordOrString
-function alias() {
-  return chain([chain('as', stringOrWord)(), stringOrWord])();
-}
+const alias = () => chain([chain('as', stringOrWord)(), stringOrWord])();
 
 // ----------------------------------- Create table statement -----------------------------------
-function createTableStatement() {
-  return chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
-}
+const createTableStatement = () => chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
 
-function tableOptions() {
-  return chain(tableOption, many(',', tableOption))();
-}
+const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
-function tableOption() {
-  return chain(stringOrWord, dataType)();
-}
+const tableOption = () => chain(stringOrWord, dataType)();
 
-function tableName() {
-  return chain([wordChain, chain(wordChain, '.', wordChain)()])();
-}
+const tableName = () => chain([wordChain, chain(wordChain, '.', wordChain)()])();
 
 // ----------------------------------- Create view statement -----------------------------------
-function createViewStatement() {
-  return chain('create', 'view', wordChain, 'as', selectStatement)();
-}
+const createViewStatement = () => chain('create', 'view', wordChain, 'as', selectStatement)();
 
 // ----------------------------------- Insert statement -----------------------------------
-function insertStatement() {
-  return chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
-}
+const insertStatement = () =>
+  chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
 
-function selectFieldsInfo() {
-  return chain('(', selectFields, ')')();
-}
+const selectFieldsInfo = () => chain('(', selectFields, ')')();
 
-function selectFields() {
-  return chain(wordChain, many(',', wordChain))();
-}
+const selectFields = () => chain(wordChain, many(',', wordChain))();
 
 // ----------------------------------- groupBy -----------------------------------
-function groupByStatement() {
-  return chain('group', 'by', fieldList)();
-}
+const groupByStatement = () => chain('group', 'by', fieldList)();
 
 // ----------------------------------- orderBy -----------------------------------
-function orderByClause() {
-  return chain('order', 'by', fieldList)();
-}
+const orderByClause = () => chain('order', 'by', fieldList)();
 
-function orderByExpressionList() {
-  return chain(orderByExpression, optional(',', orderByExpressionList))();
-}
+const orderByExpressionList = () => chain(orderByExpression, optional(',', orderByExpressionList))();
 
-function orderByExpression() {
-  return chain(expression, ['asc', 'desc'])();
-}
+const orderByExpression = () => chain(expression, ['asc', 'desc'])();
 
 // ----------------------------------- limit -----------------------------------
-function limitClause() {
-  return chain('limit', [
-    numberChain,
-    chain(numberChain, ',', numberChain)(),
-    chain(numberChain, 'offset', numberChain)()
-  ])();
-}
+const limitClause = () =>
+  chain('limit', [numberChain, chain(numberChain, ',', numberChain)(), chain(numberChain, 'offset', numberChain)()])();
 
 // ----------------------------------- Function -----------------------------------
-function functionChain() {
-  return chain([castFunction, normalFunction, ifFunction])();
-}
+const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
 
-function functionFields() {
-  return chain(functionFieldItem, many(',', functionFieldItem))();
-}
+const functionFields = () => chain(functionFieldItem, many(',', functionFieldItem))();
 
-function functionFieldItem() {
-  return chain(many(selectSpec), [field, caseStatement])();
-}
+const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])();
 
-function ifFunction() {
-  return chain('if', '(', predicate, ',', field, ',', field, ')')();
-}
+const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
-function castFunction() {
-  return chain('cast', '(', wordChain, 'as', dataType, ')')();
-}
+const castFunction = () => chain('cast', '(', wordChain, 'as', dataType, ')')();
 
-function normalFunction() {
-  return chain(wordChain, '(', optional(functionFields), ')')();
-}
+const normalFunction = () => chain(wordChain, '(', optional(functionFields), ')')();
 
 // ----------------------------------- Case -----------------------------------
-function caseStatement() {
-  return chain('case', plus(caseAlternative), optional('else', [stringChain, 'null', numberChain]), 'end')();
-}
+const caseStatement = () =>
+  chain('case', plus(caseAlternative), optional('else', [stringChain, 'null', numberChain]), 'end')();
 
-function caseAlternative() {
-  return chain('when', expression, 'then', fieldItem)();
-}
+const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
 // ----------------------------------- set statement -----------------------------------
 
-function setStatement() {
-  return chain('set', [variableAssignments])();
-}
+const setStatement = () => chain('set', [variableAssignments])();
 
-function variableAssignments() {
-  return chain(variableAssignment, many(',', variableAssignment))();
-}
+const variableAssignments = () => chain(variableAssignment, many(',', variableAssignment))();
 
-function variableAssignment() {
-  return chain(fieldItem, '=', [fieldItem, 'true'])();
-}
+const variableAssignment = () => chain(fieldItem, '=', [fieldItem, 'true'])();
 
 // ----------------------------------- Utils -----------------------------------
 
 // TODO: https://github.com/antlr/grammars-v4/blob/master/mysql/MySqlParser.g4#L1963
-function dataType() {
-  return chain([
+const dataType = () =>
+  chain([
     chain(['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext']),
     chain(['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint']),
     chain(['real', 'double', 'float']),
@@ -254,9 +177,6 @@ function dataType() {
     chain(['enum', 'set']),
     chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')
   ])(ast => ast[0]);
-}
-
-
 
 // ----------------------------------- Expression -----------------------------------
 
@@ -273,17 +193,14 @@ function dataType() {
  * | boolean_primary 
 **/
 
-function expression() {
-  return chain(expressionHead, many(logicalOperator, expression))();
-}
+const expression = () => chain(expressionHead, many(logicalOperator, expression))();
 
-function expressionHead() {
-  return chain([
+const expressionHead = () =>
+  chain([
     chain('(', expression, ')')(),
     chain(notOperator, expression)(),
     chain(booleanPrimary, optional(chain('is', optional('not'), ['true', 'false', 'unknown'])()))
   ])();
-}
 
 /*
  *boolean_primary:
@@ -293,8 +210,8 @@ function expressionHead() {
  * | boolean_primary comparison_operator {ALL | ANY} (subquery)
  * | predicate
 **/
-function booleanPrimary() {
-  return chain(
+const booleanPrimary = () =>
+  chain(
     predicate,
     many([
       'isnull',
@@ -303,7 +220,6 @@ function booleanPrimary() {
       // chain(comparisonOperator, ['ALL',  'ANY'], (subquery))
     ])
   )();
-}
 
 /*
  * predicate:
@@ -315,15 +231,14 @@ function booleanPrimary() {
  *  | field [NOT] REGEXP field
  *  | field
 **/
-function predicate() {
-  return chain(
+const predicate = () =>
+  chain(
     field,
     optional([chain(comparisonOperator, [field, 'null'])(), chain('sounds', 'like', field)(), isOrNotExpression])
   )();
-}
 
-function isOrNotExpression() {
-  return chain(optional('is'), optional('not'), [
+const isOrNotExpression = () =>
+  chain(optional('is'), optional('not'), [
     chain('in', '(', fieldList, ')')(),
     chain('between', field, 'and', predicate)(),
     chain('like', field, optional('escape', field))(),
@@ -332,81 +247,49 @@ function isOrNotExpression() {
     // 'isnull',
     // field
   ])();
-}
 
-function fieldItem() {
-  return chain([
+const fieldItem = () =>
+  chain([
     functionChain,
     chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(), // 字段
     '*'
   ])(ast => ast[0]);
-}
 
-function field() {
-  return createFourOperations(fieldItem)();
-}
+const field = () => createFourOperations(fieldItem)();
 
 // ----------------------------------- create index expression -----------------------------------
-function indexStatement() {
-  return chain('CREATE', 'INDEX', indexItem, onStatement, whereStatement)();
-}
+const indexStatement = () => chain('CREATE', 'INDEX', indexItem, onStatement, whereStatement)();
 
-// 所印象
-function indexItem() {
-  return chain(stringChain, many('.', stringChain))();
-}
+const indexItem = () => chain(stringChain, many('.', stringChain))();
 
-// on子表达式
-function onStatement() {
-  return chain('ON', stringChain, '(', fieldForIndexList, ')')();
-}
+const onStatement = () => chain('ON', stringChain, '(', fieldForIndexList, ')')();
 
-function fieldForIndex() {
-  return chain(stringChain, optional(['ASC', 'DESC']))();
-}
+const fieldForIndex = () => chain(stringChain, optional(['ASC', 'DESC']))();
 
-function fieldForIndexList() {
-  return chain(fieldForIndex, many(',', fieldForIndex))();
-}
+const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
 
 // ----------------------------------- Terminals -----------------------------------
 
-function wordChain() {
-  return chain(matchWord())(ast => ast[0]);
-}
+const wordChain = () => chain(matchWord())(ast => ast[0]);
 
-function stringChain() {
-  return chain(matchString())(ast => ast[0]);
-}
+const stringChain = () => chain(matchString())(ast => ast[0]);
 
-function numberChain() {
-  return chain(matchNumber())(ast => ast[0]);
-}
+const numberChain = () => chain(matchNumber())(ast => ast[0]);
 
-function stringOrWord() {
-  return chain([wordChain, stringChain])(ast => ast[0]);
-}
+const stringOrWord = () => chain([wordChain, stringChain])(ast => ast[0]);
 
-function stringOrWordOrNumber() {
-  return chain([wordChain, stringChain, numberChain])(ast => ast[0]);
-}
+const stringOrWordOrNumber = () => chain([wordChain, stringChain, numberChain])(ast => ast[0]);
 
 // 逻辑运算式
-function logicalOperator() {
-  return chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
-}
+const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
 // 比较
-function comparisonOperator() {
-  return chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
-}
+const comparisonOperator = () => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 
-function notOperator() {
-  return chain(['not', '!'])(ast => ast[0]);
-}
+const notOperator = () => chain(['not', '!'])(ast => ast[0]);
 
-function selectSpec() {
-  return chain([
+const selectSpec = () =>
+  chain([
     'all',
     'distinct',
     'distinctrow',
@@ -419,7 +302,6 @@ function selectSpec() {
     'sql_no_cache',
     'sql_calc_found_rows'
   ])(ast => ast[0]);
-}
 
 export class SQLAstParser {
   public rootChainNode: ChainNode;
