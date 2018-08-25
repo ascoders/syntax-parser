@@ -1,18 +1,19 @@
 import * as React from 'react';
-import { SQLAstParser, tokenConfig, Tokenizer } from '../src/sql';
+import { tokenConfig, Tokenizer } from '../src/sql';
+import { parser } from '../src/sql-extend-field-parser';
 
 class Props {}
 
 class State {}
 
-const parser = new SQLAstParser();
-
-function parse(str: string) {
+function parseExtendFieldString(str: string, offset: number) {
   const startTime = new Date();
   const tokenizer = new Tokenizer(tokenConfig);
   const tokens = tokenizer.tokenize(str);
+  // tslint:disable-next-line:no-console
+  console.log(tokens);
   const endTime1 = new Date();
-  const result = parser.parse(tokens, 100);
+  const result = parser.parse(tokens, offset);
   const endTime2 = new Date();
 
   // tslint:disable-next-line:no-console
@@ -28,9 +29,7 @@ function parse(str: string) {
   }
 }
 
-parse(
-  'CREATE INDEX `bees`.`hive_state` ON `hive` (`happiness` ASC, `anger` DESC) WHERE  NOT `happiness` AND `anger` IS NOT 0'
-);
+parseExtendFieldString(`1 + (2 * 3) + (4 * 5) + (6 * 7) + (8 + 9)`, 100);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();
