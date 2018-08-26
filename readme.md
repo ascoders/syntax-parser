@@ -2,7 +2,11 @@
 
 Light and fast parser using javascript. Both in nodejs and broswer.
 
-# Use for sql parser
+Now support:
+
+- sql parser.
+
+## Use for sql parser
 
 ```bash
 npm i cparser
@@ -14,7 +18,7 @@ import { parseSql } from 'cparser';
 console.log(parseSql('select * from table;'));
 ```
 
-# Use for custom parser
+## Use for custom parser
 
 ```typescript
 import { chain, execChain, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from 'cparser';
@@ -26,7 +30,7 @@ export const parse = (scanner: Scanner, cursorPosition = 0) => {
 };
 ```
 
-# Tests
+## Tests
 
 ```bash
 npm test
