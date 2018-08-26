@@ -330,11 +330,11 @@ export const execChain = (
   let error: {
     token: IToken;
     reason: 'wrong' | 'incomplete';
-    suggestion: IMatching[];
+    suggestions: IMatching[];
   } = null;
 
   if (!success) {
-    const suggestion = uniqBy(
+    const suggestions = uniqBy(
       (lastMatchUnderShortestRestToken
         ? findNextMatchNodes(lastMatchUnderShortestRestToken.matchNode)
         : findNextMatchNodes(chainNode)
@@ -347,13 +347,13 @@ export const execChain = (
 
     if (errorToken) {
       error = {
-        suggestion,
+        suggestions,
         token: errorToken,
         reason: 'wrong'
       };
     } else {
       error = {
-        suggestion,
+        suggestions,
         token: lastMatchUnderShortestRestToken ? lastMatchUnderShortestRestToken.token : null,
         reason: 'incomplete'
       };
