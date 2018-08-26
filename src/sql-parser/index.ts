@@ -243,9 +243,6 @@ const isOrNotExpression = () =>
     chain('between', field, 'and', predicate)(),
     chain('like', field, optional('escape', field))(),
     chain('regexp', field)()
-    // 'null',
-    // 'isnull',
-    // field
   ])();
 
 const fieldItem = () =>
@@ -280,10 +277,8 @@ const stringOrWord = () => chain([wordChain, stringChain])(ast => ast[0]);
 
 const stringOrWordOrNumber = () => chain([wordChain, stringChain, numberChain])(ast => ast[0]);
 
-// 逻辑运算式
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
-// 比较
 const comparisonOperator = () => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 
 const notOperator = () => chain(['not', '!'])(ast => ast[0]);

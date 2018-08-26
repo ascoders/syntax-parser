@@ -20,42 +20,29 @@ const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
 const statements = () => chain(statement, optional(';', statements))(binaryRecursionToArray);
 
-function statement() {
-  // TODO: , functionCall, caseExpression
-  return chain([addExpression])(ast => ast[0]);
-}
+const statement = () => chain([addExpression, functionCall, caseExpression])(ast => ast[0]);
 
-// --------------------- 四则运算 ----------------------------
+
+// --------------------- four arithmetic operations  ----------------------------
 
 const addExpression = () =>
   chain(mulExpression, many(['+', '-'], mulExpression))(ast => {
     return getAstFromArray(ast);
-    // tslint:disable-next-line:no-console
-    console.log('add', ast[1]);
-    return ast;
   });
 
 const mulExpression = () =>
   chain(mulFactor, many(['*', '/'], mulFactor))(ast => {
     return getAstFromArray(ast);
-    // tslint:disable-next-line:no-console
-    console.log('mul', ast[1]);
-    return ast;
   });
 
 const mulOperator = () => chain(['*', '/'])(ast => ast[0]);
 
 const mulFactor = () =>
   chain([numberChain, functionCall, wordChain, chain('(', addExpression, ')')(ast => ast[1])])(ast => {
-    // console.log('factor', ast[0]);
     return ast[0];
   });
 
-// function addExpression() {
-//   return createFourOperations(numberChain)();
-// }
-
-// --------------------- 比较式 ----------------------------
+// --------------------- compare expression ----------------------------
 const compareExpression = () =>
   chain(addExpression, optional(compareOperator, addExpression))(ast => {
     if (!ast[1]) {
@@ -66,10 +53,10 @@ const compareExpression = () =>
 
 const compareOperator = () => chain(['>', '<', '<>', '!=', '=', '>=', '<='])(ast => ast[0]);
 
-// --------------------- 逻辑表达式 ----------------------------
+// --------------------- logical expression ----------------------------
 
-const andExpression = () =>
-  chain(compareExpression, optional(andOperator, andExpression))(ast => {
+const logicalExpression = () =>
+  chain(compareExpression, optional(andOperator, logicalExpression))(ast => {
     if (!ast[1]) {
       return ast[0];
     }
@@ -78,18 +65,18 @@ const andExpression = () =>
 
 const andOperator = () => chain(['AND', 'OR'])(ast => ast[0]);
 
-// --------------------- 函数调用 ----------------------------
+// --------------------- function call ----------------------------
 
 const functionCall = () =>
   chain(matchWord(), '(', [addExpression, caseExpression], ')')(ast => {
     return { type: 'expression', variant: 'functioncall', name: ast[0], arguments: ast[2] };
   });
 
-// --------------------- case表达式 ----------------------------
+// --------------------- case expression ----------------------------
 
 const caseExpression = () => chain('case', optional(wordChain), plus(whenExpression), elseExpression, 'end')();
 
-const whenExpression = () => chain('when', andExpression, 'then', [wordChain, numberChain, stringChain])();
+const whenExpression = () => chain('when', logicalExpression, 'then', [wordChain, numberChain, stringChain])();
 
 const elseExpression = () => chain('else', [numberChain, stringChain, wordChain])();
 
