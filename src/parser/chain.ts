@@ -485,15 +485,11 @@ const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: n
   if (node.parentNode) {
     node.parentNode.headIndex = node.parentIndex + 1;
 
-    // nextMatching
-    // if (node.parentNode instanceof ChainNode) {
-    //   // tslint:disable-next-line:no-console
-    //   // console.log('111', node.parentNode.isPlus);
-    //   if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
-    //     console.log('lalala', node);
-    //     node.parentNode.headIndex = 0;
-    //   }
-    // }
+    // Be sure not overflow more than one.
+    if (node.parentNode.headIndex > node.parentNode.childs.length) {
+      node.parentNode.headIndex = node.parentNode.childs.length;
+    }
+
     node.parentNode.version = version;
     resetParentsHeadIndexAndVersion(node.parentNode, version);
   }
@@ -605,19 +601,5 @@ function solveFirstSet(functionName: string) {
       const relatedFunctionNames = relatedSet.get(functionName);
       relatedFunctionNames.forEach(relatedFunctionName => solveFirstSet);
     }
-  }
-}
-
-function findParentFunctionName(parentNode: ParentNode): string {
-  if (!parentNode) {
-    return null;
-  }
-
-  if (parentNode instanceof ChainNode) {
-    return parentNode.functionName;
-  } else if (parentNode instanceof TreeNode) {
-    return findParentFunctionName(parentNode.parentNode);
-  } else {
-    throw Error('Unexpected node: ' + parentNode);
   }
 }

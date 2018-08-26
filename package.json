@@ -1,6 +1,6 @@
 {
-  "name": "smart-chain",
-  "version": "1.0.2",
+  "name": "cparser",
+  "version": "0.1.0",
   "pri": {
     "type": "component"
   },
@@ -12,7 +12,6 @@
     "analyse": "pri analyse",
     "test": "pri test",
     "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'",
-    "antlr4": "antlr4 -Dlanguage=JavaScript src/SqlLexer.g4",
     "prepublishOnly": "npm run build",
     "bundle": "pri bundle"
   },

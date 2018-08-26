@@ -1,8 +1,6 @@
 import { IToken } from '../lexer/token';
 import {
   chain,
-  ChainNode,
-  ChainNodeFactory,
   execChain,
   many,
   matchNumber,
@@ -303,15 +301,8 @@ const selectSpec = () =>
     'sql_calc_found_rows'
   ])(ast => ast[0]);
 
-export class SQLAstParser {
-  public rootChainNode: ChainNode;
+const rootChainNode = root()();
 
-  constructor() {
-    this.rootChainNode = root()();
-  }
-
-  public parse = (tokens: IToken[], cursorPosition = 0) => {
-    const scanner = new Scanner(tokens);
-    return execChain(this.rootChainNode, scanner, cursorPosition, ast => ast[0]);
-  };
-}
+export const parse = (scanner: Scanner, cursorPosition = 0) => {
+  return execChain(rootChainNode, scanner, cursorPosition, ast => ast[0]);
+};

@@ -1,31 +1,17 @@
 import * as React from 'react';
-import { SQLAstParser, tokenConfig, Tokenizer } from '../src/sql';
+import { parseSql } from '../src';
 
 class Props {}
 
 class State {}
 
-const parser = new SQLAstParser();
-
 function parse(str: string) {
   const startTime = new Date();
-  const tokenizer = new Tokenizer(tokenConfig);
-  const tokens = tokenizer.tokenize(str);
-  const endTime1 = new Date();
-  const result = parser.parse(tokens, 100);
-  const endTime2 = new Date();
+  const result = parseSql(str, 'bif', 100);
+  const endTime = new Date();
 
   // tslint:disable-next-line:no-console
-  console.log('lexer time', endTime1.getTime() - startTime.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('parser time', endTime2.getTime() - endTime1.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('result', result);
-
-  if (!result.success) {
-    // tslint:disable-next-line:no-console
-    console.log('error tokens', tokens);
-  }
+  console.log('parser time', endTime.getTime() - startTime.getTime(), 'ms', ', result', result);
 }
 
 parse(
