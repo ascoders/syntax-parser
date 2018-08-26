@@ -1,21 +1,22 @@
 import { defaults, uniqBy } from 'lodash';
 import { IToken } from '../lexer/token';
+import { TokenizerFactory } from '../sql-parser/languages';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 import { tailCallOptimize } from './utils';
 
-type FirstOrFunctionSet = MatchNode | string;
+const parserMap = new Map<ChainFunction, Parser>();
 
-// First set
-const firstSet = new Map<string, MatchNode[]>();
-const firstOrFunctionSet = new Map<string, FirstOrFunctionSet[]>();
-const relatedSet = new Map<string, Set<string>>();
-
-let globalVersion = 0;
-
-function getNewVersion() {
-  return ++globalVersion;
+class Parser {
+  public version = 0;
+  public rootChainNode: ChainNode = null;
+  public firstSet = new Map<string, MatchNode[]>();
+  public firstOrFunctionSet = new Map<string, FirstOrFunctionSet[]>();
+  public relatedSet = new Map<string, Set<string>>();
+  public getNewVersion = () => ++this.version;
 }
+
+type FirstOrFunctionSet = MatchNode | string;
 
 // tslint:disable:max-classes-per-file
 
@@ -57,10 +58,10 @@ class MatchNode {
 export class FunctionNode {
   public parentNode: ParentNode;
 
-  constructor(private chainFunction: ChainFunction, public parentIndex: number) {}
+  constructor(private chainFunction: ChainFunction, public parentIndex: number, public parser: Parser) {}
 
   public run = () => {
-    return this.chainFunction()(this.parentNode, this.getFunctionName(), this.parentIndex);
+    return this.chainFunction()(this.parentNode, this.getFunctionName(), this.parentIndex, this.parser);
   };
 
   public getFunctionName = () => this.chainFunction.name;
@@ -111,16 +112,19 @@ export type ChainNodeFactory = (
   parentNode?: ParentNode,
   // If parent node is a function, here will get it's name.
   functionName?: string,
-  parentIndex?: number
+  parentIndex?: number,
+  parser?: Parser
 ) => ChainNode;
 
 export type ChainFunction = () => ChainNodeFactory;
 
-const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIndex: number): Node => {
+const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIndex: number, parser: Parser): Node => {
   if (element instanceof Array) {
     const treeNode = new TreeNode(parentIndex);
     treeNode.parentNode = parentNode;
-    treeNode.childs = element.map((eachElement, childIndex) => createNodeByElement(eachElement, treeNode, childIndex));
+    treeNode.childs = element.map((eachElement, childIndex) =>
+      createNodeByElement(eachElement, treeNode, childIndex, parser)
+    );
     return treeNode;
   } else if (typeof element === 'string') {
     const matchNode = new MatchNode(
@@ -170,13 +174,13 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
       matchNode.parentNode = parentNode;
       return matchNode;
     } else if (element.prototype.name === 'chainNodeFactory') {
-      const chainNode = element(parentNode, null, parentIndex);
+      const chainNode = element(parentNode, null, parentIndex, parser);
       if (element.prototype.isPlus) {
         chainNode.isPlus = true;
       }
       return chainNode;
     } else {
-      const functionNode = new FunctionNode(element as ChainFunction, parentIndex);
+      const functionNode = new FunctionNode(element as ChainFunction, parentIndex, parser);
       functionNode.parentNode = parentNode;
       return functionNode;
     }
@@ -186,7 +190,7 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
 };
 
 export const chain: Chain = (...elements) => (solveAst = args => args) => {
-  const chainNodeFactory: ChainNodeFactory = (parentNode, functionName, parentIndex = 0) => {
+  const chainNodeFactory: ChainNodeFactory = (parentNode, functionName, parentIndex = 0, parser) => {
     const chainNode = new ChainNode(parentIndex);
     chainNode.parentNode = parentNode;
     chainNode.functionName = functionName;
@@ -194,10 +198,10 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
 
     elements = solveDirectLeftRecursion(elements, functionName);
 
-    chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, index));
+    chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, index, parser));
 
     if (functionName) {
-      generateFirstSet(chainNode);
+      generateFirstSet(chainNode, parser);
     }
 
     return chainNode;
@@ -235,20 +239,31 @@ interface IChance {
 class VisiterStore {
   public restChances: IChance[] = [];
 
-  constructor(public scanner: Scanner, public version: number) {}
+  constructor(public scanner: Scanner, public version: number, public parser: Parser) {}
 }
 
-export const execChain = (
-  chainNode: ChainNode,
-  scanner: Scanner,
-  cursorIndex: number,
-  solveAst: ISolveAst = args => args
+export const createParser = (root: ChainFunction, tokenizerFactory: TokenizerFactory) => (
+  text: string,
+  cursorIndex = 0
 ) => {
+  const tokens = tokenizerFactory(text);
+  const scanner = new Scanner(tokens);
+
+  let parser: Parser = null;
+
+  if (parserMap.has(root)) {
+    parser = parserMap.get(root);
+  } else {
+    parser = new Parser();
+    parser.rootChainNode = root()(null, null, 0, parser);
+    parserMap.set(root, parser);
+  }
+
   // Find where token cursorIndex is in
   const cursorPrevToken = scanner.getPrevTokenFromCharacterIndex(cursorIndex);
 
   // If cursorPrevToken is null, the cursor prev node is root.
-  const cursorPrevNodes: Node[] = cursorPrevToken === null ? [chainNode] : [];
+  const cursorPrevNodes: Node[] = cursorPrevToken === null ? [parser.rootChainNode] : [];
 
   let success: boolean = false;
   let ast: IAst = null;
@@ -260,67 +275,72 @@ export const execChain = (
     token: IToken;
   } = null;
 
-  const newVersion = getNewVersion();
+  const newVersion = parser.getNewVersion();
 
-  newVisiter(chainNode, newVersion, scanner, {
-    onCallVisiter: node => {
-      callVisiterCount++;
+  newVisiter(
+    parser.rootChainNode,
+    newVersion,
+    scanner,
+    {
+      onCallVisiter: node => {
+        callVisiterCount++;
 
-      if (callVisiterCount > MAX_VISITER_CALL) {
-        throw Error('call visiter more then ' + MAX_VISITER_CALL);
-      }
-    },
-    onCallParentNode: node => {
-      callParentCount++;
+        if (callVisiterCount > MAX_VISITER_CALL) {
+          throw Error('call visiter more then ' + MAX_VISITER_CALL);
+        }
+      },
+      onCallParentNode: node => {
+        callParentCount++;
+        if (callParentCount > MAX_VISITER_CALL) {
+          throw Error('call parent more then' + MAX_VISITER_CALL);
+        }
+      },
+      onSuccess: () => {
+        success = true;
+        ast = parser.rootChainNode.astResults;
+      },
+      onMatchNode: (matchNode, store, currentVisiterOption) => {
+        const matchResult = matchNode.run(store.scanner);
 
-      if (callParentCount > MAX_VISITER_CALL) {
-        throw Error('call parent more then' + MAX_VISITER_CALL);
-      }
-    },
-    onSuccess: () => {
-      success = true;
-      ast = solveAst(chainNode.astResults);
-    },
-    onMatchNode: (matchNode, store, currentVisiterOption) => {
-      const matchResult = matchNode.run(store.scanner);
-
-      if (!matchResult.match) {
-        // console.log('xxxxxxx', matchResult.token && matchResult.token.value, matchNode.matching);
-        tryChances(matchNode, store, currentVisiterOption);
-      } else {
-        const restTokenCount = store.scanner.getRestTokenCount();
-        if (matchNode.matching.type !== 'loose') {
-          // Last match at least token remaining, is the most readable reason for error.
-          if (
-            !lastMatchUnderShortestRestToken ||
-            (lastMatchUnderShortestRestToken && lastMatchUnderShortestRestToken.restTokenCount > restTokenCount)
-          ) {
-            lastMatchUnderShortestRestToken = {
-              matchNode,
-              token: matchResult.token,
-              restTokenCount
-            };
+        if (!matchResult.match) {
+          // console.log('xxxxxxx', matchResult.token && matchResult.token.value, matchNode.matching);
+          tryChances(matchNode, store, currentVisiterOption);
+        } else {
+          const restTokenCount = store.scanner.getRestTokenCount();
+          if (matchNode.matching.type !== 'loose') {
+            // Last match at least token remaining, is the most readable reason for error.
+            if (
+              !lastMatchUnderShortestRestToken ||
+              (lastMatchUnderShortestRestToken && lastMatchUnderShortestRestToken.restTokenCount > restTokenCount)
+            ) {
+              lastMatchUnderShortestRestToken = {
+                matchNode,
+                token: matchResult.token,
+                restTokenCount
+              };
+            }
           }
-        }
 
-        // console.log('ooooooo', matchResult.token && matchResult.token.value, matchNode.matching);
-        // If cursor prev token isn't null, it may a cursor prev node.
-        if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
-          cursorPrevNodes.push(matchNode);
-        }
+          // console.log('ooooooo', matchResult.token && matchResult.token.value, matchNode.matching);
+          // If cursor prev token isn't null, it may a cursor prev node.
+          if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
+            cursorPrevNodes.push(matchNode);
+          }
 
-        callParentNode(matchNode, store, currentVisiterOption, matchResult.token);
+          callParentNode(matchNode, store, currentVisiterOption, matchResult.token);
+        }
+      },
+      onFail: node => {
+        success = false;
       }
     },
-    onFail: node => {
-      success = false;
-    }
-  });
+    parser
+  );
 
   // Get next matchings
   let nextMatchings = cursorPrevNodes.reduce(
     (all, cursorPrevMatchNode) => {
-      return all.concat(findNextMatchNodes(cursorPrevMatchNode).map(each => each.matching));
+      return all.concat(findNextMatchNodes(cursorPrevMatchNode, parser).map(each => each.matching));
     },
     [] as IMatching[]
   );
@@ -336,8 +356,8 @@ export const execChain = (
   if (!success) {
     const suggestions = uniqBy(
       (lastMatchUnderShortestRestToken
-        ? findNextMatchNodes(lastMatchUnderShortestRestToken.matchNode)
-        : findNextMatchNodes(chainNode)
+        ? findNextMatchNodes(lastMatchUnderShortestRestToken.matchNode, parser)
+        : findNextMatchNodes(parser.rootChainNode, parser)
       ).map(each => each.matching),
       each => each.type + each.value
     );
@@ -369,11 +389,11 @@ export const execChain = (
   };
 };
 
-function newVisiter(node: Node, version: number, scanner: Scanner, visiterOption: VisiterOption) {
+function newVisiter(node: Node, version: number, scanner: Scanner, visiterOption: VisiterOption, parser: Parser) {
   const defaultVisiterOption = new VisiterOption();
   defaults(visiterOption, defaultVisiterOption);
 
-  const newStore = new VisiterStore(scanner, version);
+  const newStore = new VisiterStore(scanner, version, parser);
   visiter(node, newStore, visiterOption);
 }
 
@@ -391,8 +411,13 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
   if (node instanceof ChainNode) {
     resetHeadByVersion(node, store);
     // If has first set, we can fail soon.
-    if (visiterOption.enableFirstSet && node.functionName && node.headIndex === 0 && firstSet.has(node.functionName)) {
-      const firstMatchNodes = firstSet.get(node.functionName);
+    if (
+      visiterOption.enableFirstSet &&
+      node.functionName &&
+      node.headIndex === 0 &&
+      store.parser.firstSet.has(node.functionName)
+    ) {
+      const firstMatchNodes = store.parser.firstSet.get(node.functionName);
 
       // If not match any first match node, set false
       if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
@@ -492,7 +517,7 @@ const callParentNode = tailCallOptimize(
 );
 
 function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
-  store.version = getNewVersion();
+  store.version = store.parser.getNewVersion();
 
   if (store.restChances.length === 0) {
     if (visiterOption.onFail) {
@@ -551,8 +576,8 @@ const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: n
 });
 
 // find all tokens that may appear next
-function findNextMatchNodes(node: Node): MatchNode[] {
-  const newVersion = getNewVersion();
+function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
+  const newVersion = parser.getNewVersion();
   resetParentsHeadIndexAndVersion(node, newVersion);
 
   const nextMatchNodes: MatchNode[] = [];
@@ -573,45 +598,45 @@ function findNextMatchNodes(node: Node): MatchNode[] {
   };
 
   if (node.parentNode) {
-    newVisiter(node.parentNode, newVersion, new Scanner([]), visiterOption);
+    newVisiter(node.parentNode, newVersion, new Scanner([]), visiterOption, parser);
   } else {
-    newVisiter(node, newVersion, new Scanner([]), visiterOption);
+    newVisiter(node, newVersion, new Scanner([]), visiterOption, parser);
   }
 
   return nextMatchNodes;
 }
 
-function generateFirstSet(node: ChainNode) {
+function generateFirstSet(node: ChainNode, parser: Parser) {
   const functionName = node.functionName;
 
-  if (firstSet.has(functionName)) {
+  if (parser.firstSet.has(functionName)) {
     return;
   }
 
-  const firstMatchNodes = getFirstOrFunctionSet(node, functionName);
-  firstOrFunctionSet.set(functionName, firstMatchNodes);
+  const firstMatchNodes = getFirstOrFunctionSet(node, functionName, parser);
+  parser.firstOrFunctionSet.set(functionName, firstMatchNodes);
 
-  solveFirstSet(functionName);
+  solveFirstSet(functionName, parser);
 
   return firstMatchNodes;
 }
 
-function getFirstOrFunctionSet(node: Node, functionName: string): FirstOrFunctionSet[] {
+function getFirstOrFunctionSet(node: Node, functionName: string, parser: Parser): FirstOrFunctionSet[] {
   if (node instanceof ChainNode) {
     if (node.childs[0]) {
-      return getFirstOrFunctionSet(node.childs[0], functionName);
+      return getFirstOrFunctionSet(node.childs[0], functionName, parser);
     }
   } else if (node instanceof TreeNode) {
-    return node.childs.reduce((all, next) => all.concat(getFirstOrFunctionSet(next, functionName)), []);
+    return node.childs.reduce((all, next) => all.concat(getFirstOrFunctionSet(next, functionName, parser)), []);
   } else if (node instanceof MatchNode) {
     return [node];
   } else if (node instanceof FunctionNode) {
     const relatedFunctionName = node.getFunctionName();
 
-    if (relatedSet.has(relatedFunctionName)) {
-      relatedSet.get(relatedFunctionName).add(functionName);
+    if (parser.relatedSet.has(relatedFunctionName)) {
+      parser.relatedSet.get(relatedFunctionName).add(functionName);
     } else {
-      relatedSet.set(relatedFunctionName, new Set([functionName]));
+      parser.relatedSet.set(relatedFunctionName, new Set([functionName]));
     }
 
     return [relatedFunctionName];
@@ -620,19 +645,19 @@ function getFirstOrFunctionSet(node: Node, functionName: string): FirstOrFunctio
   }
 }
 
-function solveFirstSet(functionName: string) {
-  if (firstSet.has(functionName)) {
+function solveFirstSet(functionName: string, parser: Parser) {
+  if (parser.firstSet.has(functionName)) {
     return;
   }
 
-  const firstMatchNodes = firstOrFunctionSet.get(functionName);
+  const firstMatchNodes = parser.firstOrFunctionSet.get(functionName);
 
   // Try if relate functionName has done first set.
   const newFirstMatchNodes = firstMatchNodes.reduce(
     (all, firstMatchNode) => {
       if (typeof firstMatchNode === 'string') {
-        if (firstSet.has(firstMatchNode)) {
-          all = all.concat(firstSet.get(firstMatchNode));
+        if (parser.firstSet.has(firstMatchNode)) {
+          all = all.concat(parser.firstSet.get(firstMatchNode));
         } else {
           all.push(firstMatchNode);
         }
@@ -645,15 +670,15 @@ function solveFirstSet(functionName: string) {
     [] as FirstOrFunctionSet[]
   );
 
-  firstOrFunctionSet.set(functionName, newFirstMatchNodes);
+  parser.firstOrFunctionSet.set(functionName, newFirstMatchNodes);
 
   // If all set hasn't function node, we can solve it's relative set.
   if (newFirstMatchNodes.every(firstMatchNode => firstMatchNode instanceof MatchNode)) {
-    firstSet.set(functionName, newFirstMatchNodes as MatchNode[]);
+    parser.firstSet.set(functionName, newFirstMatchNodes as MatchNode[]);
 
     // If this functionName has related functionNames, solve them
-    if (relatedSet.has(functionName)) {
-      const relatedFunctionNames = relatedSet.get(functionName);
+    if (parser.relatedSet.has(functionName)) {
+      const relatedFunctionNames = parser.relatedSet.get(functionName);
       relatedFunctionNames.forEach(relatedFunctionName => solveFirstSet);
     }
   }

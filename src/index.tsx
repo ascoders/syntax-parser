@@ -1,2 +1,2 @@
 export * from './parser';
-export * from './sql';
+export { sqlParse } from './sql-parser';

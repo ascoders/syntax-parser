@@ -1,12 +1,35 @@
 # cparser
 
-Light and fast parser using javascript. Both in nodejs and broswer.
+cparser is a parser using pure javascript, so it can both run in browser and nodejs.
 
-Now support:
+It supports:
 
+- standard parser.
+- custom sql parser.
 - sql parser.
 
-## Use for sql parser
+## Using for standard parser
+
+TODO.
+
+## Using for custom sql parser
+
+```typescript
+import { chain, matchWord, createParser, sqlTokenizer } from 'cparser';
+
+const root = () => chain('select', matchWord, 'from', matchWord, ';')();
+
+export const sqlParse = createParser(root, sqlTokenizer);
+```
+
+And use `parse` to parse sql string:
+
+```typescript
+const result = sqlParse('select name from table_name;');
+console.log(result); // {success, ast, error, nextMatchings}
+```
+
+## Using for sql parser
 
 ```bash
 npm i cparser
@@ -16,18 +39,6 @@ npm i cparser
 import { parseSql } from 'cparser';
 
 console.log(parseSql('select * from table;'));
-```
-
-## Use for custom parser
-
-```typescript
-import { chain, execChain, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from 'cparser';
-
-const root = () => chain('select', '*', 'from', 'table', ';')();
-
-export const parse = (scanner: Scanner, cursorPosition = 0) => {
-  return execChain(root, scanner, cursorPosition, ast => ast[0]);
-};
 ```
 
 ## Tests

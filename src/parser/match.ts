@@ -56,36 +56,25 @@ export const match = createMatch((scanner, word: string | string[], isCostToken)
   matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
 );
 
-export const matchWord = createMatch((scanner, word: string | string[], isCostToken) => {
-  if (!word) {
-    return matchToken(scanner, token => token.type === tokenTypes.WORD, isCostToken);
-  } else {
-    return matchToken(
-      scanner,
-      token => token.type === tokenTypes.WORD && equalWordOrIncludeWords(token.value, word),
-      isCostToken
-    );
-  }
-}, 'word');
+export const matchWord = createMatch((scanner, word, isCostToken) => {
+  return matchToken(scanner, token => token.type === tokenTypes.WORD, isCostToken);
+}, 'word')();
 
 export const matchString = createMatch(
   (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.STRING, isCostToken),
   'string'
-);
+)();
 
 export const matchNumber = createMatch(
   (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.NUMBER, isCostToken),
   'number'
-);
-
-export const matchWordOrString = createMatch((scanner, compare, isCostToken) =>
-  matchToken(scanner, token => token.type === tokenTypes.WORD || token.type === tokenTypes.STRING, isCostToken)
-);
+)();
 
 export const matchTrue = (): IMatch => ({
   token: null,
   match: true
 });
+
 export const matchFalse = (): IMatch => ({
   token: null,
   match: true

@@ -2,7 +2,7 @@ import { IToken } from '../lexer/token';
 import {
   chain,
   ChainNode,
-  execChain,
+  createParser,
   many,
   matchNumber,
   matchString,
@@ -13,6 +13,7 @@ import {
 } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
 import { createFourOperations } from '../sql-parser/four-operations';
+import { sqlTokenizer } from '../sql-parser/languages';
 import { getAstFromArray, reversalAst } from './utils';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
@@ -20,7 +21,6 @@ const root = () => chain(statements, optional(';'))(ast => ast[0]);
 const statements = () => chain(statement, optional(';', statements))(binaryRecursionToArray);
 
 const statement = () => chain([addExpression, functionCall, caseExpression])(ast => ast[0]);
-
 
 // --------------------- four arithmetic operations  ----------------------------
 
@@ -67,7 +67,7 @@ const andOperator = () => chain(['AND', 'OR'])(ast => ast[0]);
 // --------------------- function call ----------------------------
 
 const functionCall = () =>
-  chain(matchWord(), '(', [addExpression, caseExpression], ')')(ast => {
+  chain(matchWord, '(', [addExpression, caseExpression], ')')(ast => {
     return { type: 'expression', variant: 'functioncall', name: ast[0], arguments: ast[2] };
   });
 
@@ -82,25 +82,12 @@ const elseExpression = () => chain('else', [numberChain, stringChain, wordChain]
 // --------------------- terminals ----------------------------
 
 // field
-const wordChain = () => chain(matchWord())(ast => ast[0]);
+const wordChain = () => chain(matchWord)(ast => ast[0]);
 
 // string
-const stringChain = () => chain(matchString())(ast => ast[0]);
+const stringChain = () => chain(matchString)(ast => ast[0]);
 
 // number
-const numberChain = () => chain(matchNumber())(ast => ast[0]);
+const numberChain = () => chain(matchNumber)(ast => ast[0]);
 
-class ExtendFieldParser {
-  public rootChainNode: ChainNode;
-
-  constructor() {
-    this.rootChainNode = root()();
-  }
-
-  public parse = (tokens: IToken[], cursorPosition = 0) => {
-    const scanner = new Scanner(tokens);
-    return execChain(this.rootChainNode, scanner, cursorPosition, ast => ast[0]);
-  };
-}
-
-export const parser = new ExtendFieldParser();
+export const parser = createParser(root, sqlTokenizer);

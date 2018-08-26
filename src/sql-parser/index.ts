@@ -1,7 +1,8 @@
 import { IToken } from '../lexer/token';
-import { chain, execChain, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from '../parser';
+import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
 import { createFourOperations } from './four-operations';
+import { sqlTokenizer } from './languages';
 
 const unaryOperator = ['!', '~', '+', '-', 'NOT'];
 const bitOperator = ['<<', '>>', '&', '^', '|'];
@@ -9,7 +10,7 @@ const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
-const statements = () => chain(statement, many(';', statement))(binaryRecursionToArray);
+const statements = () => chain(statement, many(';', statement))();
 
 const statement = () =>
   chain([selectStatement, createTableStatement, insertStatement, createViewStatement, setStatement, indexStatement])(
@@ -99,13 +100,13 @@ const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
 const tableOption = () => chain(stringOrWord, dataType)();
 
-const tableName = () => chain([wordChain, chain(wordChain, '.', wordChain)()])();
+const tableName = () => chain([matchWord, chain(matchWord, '.', matchWord)()])();
 
 // ----------------------------------- Having --------------------------------------------------
 const havingStatement = () => chain('having', expression)();
 
 // ----------------------------------- Create view statement -----------------------------------
-const createViewStatement = () => chain('create', 'view', wordChain, 'as', selectStatement)();
+const createViewStatement = () => chain('create', 'view', matchWord, 'as', selectStatement)();
 
 // ----------------------------------- Insert statement -----------------------------------
 const insertStatement = () =>
@@ -113,7 +114,7 @@ const insertStatement = () =>
 
 const selectFieldsInfo = () => chain('(', selectFields, ')')();
 
-const selectFields = () => chain(wordChain, many(',', wordChain))();
+const selectFields = () => chain(matchWord, many(',', matchWord))();
 
 // ----------------------------------- groupBy -----------------------------------
 const groupByStatement = () => chain('group', 'by', fieldList)();
@@ -127,7 +128,7 @@ const orderByExpression = () => chain(expression, optional(['asc', 'desc']))();
 
 // ----------------------------------- limit -----------------------------------
 const limitClause = () =>
-  chain('limit', [numberChain, chain(numberChain, ',', numberChain)(), chain(numberChain, 'offset', numberChain)()])();
+  chain('limit', [matchNumber, chain(matchNumber, ',', matchNumber)(), chain(matchNumber, 'offset', matchNumber)()])();
 
 // ----------------------------------- Function -----------------------------------
 const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
@@ -138,13 +139,13 @@ const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])(
 
 const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
-const castFunction = () => chain('cast', '(', wordChain, 'as', dataType, ')')();
+const castFunction = () => chain('cast', '(', matchWord, 'as', dataType, ')')();
 
-const normalFunction = () => chain(wordChain, '(', optional(functionFields), ')')();
+const normalFunction = () => chain(matchWord, '(', optional(functionFields), ')')();
 
 // ----------------------------------- Case -----------------------------------
 const caseStatement = () =>
-  chain('case', plus(caseAlternative), optional('else', [stringChain, 'null', numberChain]), 'end')();
+  chain('case', plus(caseAlternative), optional('else', [matchString, 'null', matchNumber]), 'end')();
 
 const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
@@ -250,25 +251,19 @@ const field = () => createFourOperations(fieldItem)();
 // ----------------------------------- create index expression -----------------------------------
 const indexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
 
-const indexItem = () => chain(stringChain, many('.', stringChain))();
+const indexItem = () => chain(matchString, many('.', matchString))();
 
-const onStatement = () => chain('ON', stringChain, '(', fieldForIndexList, ')')();
+const onStatement = () => chain('ON', matchString, '(', fieldForIndexList, ')')();
 
-const fieldForIndex = () => chain(stringChain, optional(['ASC', 'DESC']))();
+const fieldForIndex = () => chain(matchString, optional(['ASC', 'DESC']))();
 
 const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
 
 // ----------------------------------- Terminals -----------------------------------
 
-const wordChain = () => chain(matchWord())(ast => ast[0]);
+const stringOrWord = () => chain([matchWord, matchString])(ast => ast[0]);
 
-const stringChain = () => chain(matchString())(ast => ast[0]);
-
-const numberChain = () => chain(matchNumber())(ast => ast[0]);
-
-const stringOrWord = () => chain([wordChain, stringChain])(ast => ast[0]);
-
-const stringOrWordOrNumber = () => chain([wordChain, stringChain, numberChain])(ast => ast[0]);
+const stringOrWordOrNumber = () => chain([matchWord, matchString, matchNumber])(ast => ast[0]);
 
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
@@ -291,8 +286,4 @@ const selectSpec = () =>
     'sql_calc_found_rows'
   ])(ast => ast[0]);
 
-const rootChainNode = root()();
-
-export const parse = (scanner: Scanner, cursorPosition = 0) => {
-  return execChain(rootChainNode, scanner, cursorPosition, ast => ast[0]);
-};
+export const sqlParse = createParser(root, sqlTokenizer);

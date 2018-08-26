@@ -1,7 +1,7 @@
 import test from 'ava';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseSql } from '../src/sql';
+import { sqlParse } from '../src';
 
 const sqlTests: Array<{
   groupName: string;
@@ -34,7 +34,7 @@ sqlGroups.forEach(sqlGroup => {
 sqlTests.forEach(sqlTest => {
   sqlTest.childs.forEach(eachTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
-      const result = parseSql(eachTest.content);
+      const result = sqlParse(eachTest.content);
 
       if (!result.success) {
         // tslint:disable-next-line:no-console
