@@ -1,36 +1,43 @@
 import * as React from 'react';
-import { SQLAstParser, tokenConfig, Tokenizer } from '../src/sql';
+import { parseSql } from '../src';
 
 class Props {}
 
 class State {}
 
-const parser = new SQLAstParser();
-
 function parse(str: string) {
   const startTime = new Date();
-  const tokenizer = new Tokenizer(tokenConfig);
-  const tokens = tokenizer.tokenize(str);
-  const endTime1 = new Date();
-  const result = parser.parse(tokens, 100);
-  const endTime2 = new Date();
+  const result = parseSql(str, 'bif', 100);
+  const endTime = new Date();
 
   // tslint:disable-next-line:no-console
-  console.log('lexer time', endTime1.getTime() - startTime.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('parser time', endTime2.getTime() - endTime1.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('result', result);
-
-  if (!result.success) {
-    // tslint:disable-next-line:no-console
-    console.log('error tokens', tokens);
-  }
+  console.log('parser time', endTime.getTime() - startTime.getTime(), 'ms', ', result', result);
 }
 
-parse(
-  'CREATE INDEX `bees`.`hive_state` ON `hive` (`happiness` ASC, `anger` DESC) WHERE  NOT `happiness` AND `anger` IS NOT 0'
-);
+parse(`
+/* select id from Movies where id in
+ * (select movie_id from Rooms where seats > 75);
+ * SELECT 1; /* select id from Movies where id in
+ * (select movie_id from Rooms where seats > 75);
+ * /*
+ * nested block comment -- here is another one
+ * /* another nest level
+ * and this
+ *
+ * some more stuff here
+ */
+
+select movie_id
+ -- FROM Movies
+ -- WHERE seats != 0
+from Rooms -- unicorn
+AS hat
+   -- comments!
+where seats > 75 -- happy birthday
+
+;SELECT 2 FROM -- comments
+hats
+`);
 
 export default class Page extends React.PureComponent<Props, State> {
   public static defaultProps = new Props();

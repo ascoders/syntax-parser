@@ -1,17 +1,5 @@
 import { IToken } from '../lexer/token';
-import {
-  chain,
-  ChainNode,
-  ChainNodeFactory,
-  execChain,
-  many,
-  matchNumber,
-  matchString,
-  matchWord,
-  optional,
-  plus,
-  Scanner
-} from '../parser';
+import { chain, execChain, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
 import { createFourOperations } from './four-operations';
 
@@ -51,7 +39,8 @@ const selectStatement = () =>
 
 const union = () => chain('union', ['all', 'distinct'])();
 
-const fromClause = () => chain('from', tableSources, optional(whereStatement), optional(groupByStatement))();
+const fromClause = () =>
+  chain('from', tableSources, optional(whereStatement), optional(groupByStatement), optional(havingStatement))();
 
 const selectList = () =>
   chain(selectField, many(',', selectField))(ast => {
@@ -111,6 +100,9 @@ const tableOption = () => chain(stringOrWord, dataType)();
 
 const tableName = () => chain([wordChain, chain(wordChain, '.', wordChain)()])();
 
+// ----------------------------------- Having --------------------------------------------------
+const havingStatement = () => chain('having', expression)();
+
 // ----------------------------------- Create view statement -----------------------------------
 const createViewStatement = () => chain('create', 'view', wordChain, 'as', selectStatement)();
 
@@ -126,11 +118,11 @@ const selectFields = () => chain(wordChain, many(',', wordChain))();
 const groupByStatement = () => chain('group', 'by', fieldList)();
 
 // ----------------------------------- orderBy -----------------------------------
-const orderByClause = () => chain('order', 'by', fieldList)();
+const orderByClause = () => chain('order', 'by', orderByExpressionList)();
 
-const orderByExpressionList = () => chain(orderByExpression, optional(',', orderByExpressionList))();
+const orderByExpressionList = () => chain(orderByExpression, many(',', orderByExpression))();
 
-const orderByExpression = () => chain(expression, ['asc', 'desc'])();
+const orderByExpression = () => chain(expression, optional(['asc', 'desc']))();
 
 // ----------------------------------- limit -----------------------------------
 const limitClause = () =>
@@ -298,15 +290,8 @@ const selectSpec = () =>
     'sql_calc_found_rows'
   ])(ast => ast[0]);
 
-export class SQLAstParser {
-  public rootChainNode: ChainNode;
+const rootChainNode = root()();
 
-  constructor() {
-    this.rootChainNode = root()();
-  }
-
-  public parse = (tokens: IToken[], cursorPosition = 0) => {
-    const scanner = new Scanner(tokens);
-    return execChain(this.rootChainNode, scanner, cursorPosition, ast => ast[0]);
-  };
-}
+export const parse = (scanner: Scanner, cursorPosition = 0) => {
+  return execChain(rootChainNode, scanner, cursorPosition, ast => ast[0]);
+};

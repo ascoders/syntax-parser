@@ -2,7 +2,6 @@ import { IToken } from '../lexer/token';
 import {
   chain,
   ChainNode,
-  ChainNodeFactory,
   execChain,
   many,
   matchNumber,

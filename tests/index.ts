@@ -1,7 +1,7 @@
 import test from 'ava';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SQLAstParser, tokenConfig, Tokenizer } from '../src/sql';
+import { parseSql } from '../src/sql';
 
 const sqlTests: Array<{
   groupName: string;
@@ -31,14 +31,10 @@ sqlGroups.forEach(sqlGroup => {
   });
 });
 
-const parser = new SQLAstParser();
-
 sqlTests.forEach(sqlTest => {
   sqlTest.childs.forEach(eachTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
-      const tokenizer = new Tokenizer(tokenConfig);
-      const tokens = tokenizer.tokenize(eachTest.content);
-      const result = parser.parse(tokens);
+      const result = parseSql(eachTest.content);
 
       if (!result.success) {
         // tslint:disable-next-line:no-console

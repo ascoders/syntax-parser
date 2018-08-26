@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { tokenConfig, Tokenizer } from '../src/sql';
-import { parser } from '../src/sql-extend-field-parser';
+import { parseSql } from '../src';
 
 class Props {}
 
@@ -8,25 +7,11 @@ class State {}
 
 function parseExtendFieldString(str: string, offset: number) {
   const startTime = new Date();
-  const tokenizer = new Tokenizer(tokenConfig);
-  const tokens = tokenizer.tokenize(str);
-  // tslint:disable-next-line:no-console
-  console.log(tokens);
-  const endTime1 = new Date();
-  const result = parser.parse(tokens, offset);
-  const endTime2 = new Date();
+  const result = parseSql(str, null, offset);
+  const endTime = new Date();
 
   // tslint:disable-next-line:no-console
-  console.log('lexer time', endTime1.getTime() - startTime.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('parser time', endTime2.getTime() - endTime1.getTime(), 'ms');
-  // tslint:disable-next-line:no-console
-  console.log('result', result);
-
-  if (!result.success) {
-    // tslint:disable-next-line:no-console
-    console.log('error tokens', tokens);
-  }
+  console.log('lexer time', endTime.getTime() - startTime.getTime(), 'ms', ', result', result);
 }
 
 parseExtendFieldString(`1 + (2 * 3) + (4 * 5) + (6 * 7) + (8 + 9)`, 100);
