@@ -17,7 +17,9 @@ function parse(str: string) {
 }
 
 parse(`
-select a as b xxx
+select x from foo where (a or b) and c;
+select x from foo where a or b and c
+
 `);
 
 export default class Page extends React.PureComponent<Props, State> {
