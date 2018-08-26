@@ -19,13 +19,13 @@ import { chain, matchWord, createParser, sqlTokenizer } from 'cparser';
 
 const root = () => chain('select', matchWord, 'from', matchWord, ';')();
 
-export const sqlParse = createParser(root, sqlTokenizer);
+export const mySqlParse = createParser(root, sqlTokenizer);
 ```
 
 And use `parse` to parse sql string:
 
 ```typescript
-const result = sqlParse('select name from table_name;');
+const result = mySqlParse('select name from table_name;');
 console.log(result); // {success, ast, error, nextMatchings}
 ```
 
@@ -36,9 +36,9 @@ npm i cparser
 ```
 
 ```typescript
-import { parseSql } from 'cparser';
+import { sqlParse } from 'cparser';
 
-console.log(parseSql('select * from table;'));
+console.log(sqlParse('select * from table;'));
 ```
 
 ## Tests
