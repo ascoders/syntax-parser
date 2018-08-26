@@ -31,7 +31,23 @@ export class Scanner {
   };
 
   public getIndex = () => this.index;
+
   public setIndex = (index: number) => (this.index = index);
+
+  public getRestTokenCount = () => this.tokens.length - this.index - 1;
+
+  public getNextFromToken = (token: IToken) => {
+    const currentTokenIndex = this.tokens.findIndex(eachToken => eachToken === token);
+    if (currentTokenIndex > -1) {
+      if (currentTokenIndex + 1 < this.tokens.length) {
+        return this.tokens[currentTokenIndex + 1];
+      } else {
+        return null;
+      }
+    } else {
+      throw Error(`token ${token.value} not exist in scanner.`);
+    }
+  };
 
   public isEnd = () => {
     return this.index >= this.tokens.length;

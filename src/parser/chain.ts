@@ -254,6 +254,11 @@ export const execChain = (
   let ast: IAst = null;
   let callVisiterCount = 0;
   let callParentCount = 0;
+  let lastMatchUnderShortestRestToken: {
+    restTokenCount: number;
+    matchNode: MatchNode;
+    token: IToken;
+  } = null;
 
   const newVersion = getNewVersion();
 
@@ -283,6 +288,21 @@ export const execChain = (
         // console.log('xxxxxxx', matchResult.token && matchResult.token.value, matchNode.matching);
         tryChances(matchNode, store, currentVisiterOption);
       } else {
+        const restTokenCount = store.scanner.getRestTokenCount();
+        if (matchNode.matching.type !== 'loose') {
+          // Last match at least token remaining, is the most readable reason for error.
+          if (
+            !lastMatchUnderShortestRestToken ||
+            (lastMatchUnderShortestRestToken && lastMatchUnderShortestRestToken.restTokenCount > restTokenCount)
+          ) {
+            lastMatchUnderShortestRestToken = {
+              matchNode,
+              token: matchResult.token,
+              restTokenCount
+            };
+          }
+        }
+
         // console.log('ooooooo', matchResult.token && matchResult.token.value, matchNode.matching);
         // If cursor prev token isn't null, it may a cursor prev node.
         if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
@@ -292,25 +312,60 @@ export const execChain = (
         callParentNode(matchNode, store, currentVisiterOption, matchResult.token);
       }
     },
-    onFail: () => {
+    onFail: node => {
       success = false;
     }
   });
 
+  // Get next matchings
   let nextMatchings = cursorPrevNodes.reduce(
     (all, cursorPrevMatchNode) => {
       return all.concat(findNextMatchNodes(cursorPrevMatchNode).map(each => each.matching));
     },
     [] as IMatching[]
   );
-
   nextMatchings = uniqBy(nextMatchings, each => each.type + each.value);
+
+  // Get error message
+  let error: {
+    token: IToken;
+    reason: 'wrong' | 'incomplete';
+    suggestion: IMatching[];
+  } = null;
+
+  if (!success) {
+    const suggestion = uniqBy(
+      (lastMatchUnderShortestRestToken
+        ? findNextMatchNodes(lastMatchUnderShortestRestToken.matchNode)
+        : findNextMatchNodes(chainNode)
+      ).map(each => each.matching),
+      each => each.type + each.value
+    );
+
+    const errorToken =
+      lastMatchUnderShortestRestToken && scanner.getNextFromToken(lastMatchUnderShortestRestToken.token);
+
+    if (errorToken) {
+      error = {
+        suggestion,
+        token: errorToken,
+        reason: 'wrong'
+      };
+    } else {
+      error = {
+        suggestion,
+        token: lastMatchUnderShortestRestToken ? lastMatchUnderShortestRestToken.token : null,
+        reason: 'incomplete'
+      };
+    }
+  }
 
   return {
     success,
     ast,
     callVisiterCount,
-    nextMatchings: nextMatchings.reverse()
+    nextMatchings: nextMatchings.reverse(),
+    error
   };
 };
 

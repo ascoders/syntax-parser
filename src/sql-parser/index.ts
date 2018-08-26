@@ -66,16 +66,17 @@ const fieldList = () => chain(field, many(',', field))();
 
 const tableSources = () => chain(tableSource, many(',', tableSource))();
 
+// prettier-ignore
 const tableSource = () =>
-  chain(
-    [chain(tableSourceItem, many(joinPart))(), chain('(', tableSourceItem, many(joinPart), ')')()],
-    optional(alias)
-  )();
+  chain([
+    chain(tableSourceItem, many(joinPart))(),
+    chain('(', tableSourceItem, many(joinPart), ')')()
+  ])();
 
 const tableSourceItem = () =>
   chain([
     chain(tableName, optional(alias))(),
-    chain([selectStatement, chain('(', selectStatement, ')')()], optional(alias))(),
+    chain([selectStatement, chain('(', selectStatement, ')')()], alias)(),
     chain('(', tableSources, ')')()
   ])();
 
@@ -247,7 +248,7 @@ const fieldItem = () =>
 const field = () => createFourOperations(fieldItem)();
 
 // ----------------------------------- create index expression -----------------------------------
-const indexStatement = () => chain('CREATE', 'INDEX', indexItem, onStatement, whereStatement)();
+const indexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
 
 const indexItem = () => chain(stringChain, many('.', stringChain))();
 
