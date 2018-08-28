@@ -577,6 +577,11 @@ const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: n
 
 // find all tokens that may appear next
 function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
+  // Skip parent tree node, because chain -> tree -> match(findNextMatchNodes) equals to chain -> tree(findNextMatchNodes)
+  if (node.parentNode instanceof TreeNode) {
+    return findNextMatchNodes(node.parentNode, parser);
+  }
+
   const newVersion = parser.getNewVersion();
   resetParentsHeadIndexAndVersion(node, newVersion);
 
