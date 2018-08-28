@@ -34,7 +34,7 @@ AND (KEYVALUE(args,',', '=', 'business_type') = "DWVideo" )
 AND (KEYVALUE(args,',', '=', 'player_type') = "ijkplayer" )
 AND (KEYVALUE(args,',', '=', 'is_usecache') = "1" )
 AND (KEYVALUE(args,',', '=', 'is_tbnet') = "1" )
-AND province in ('浙江省')
+AND province in ('aaa')
 AND school in ('移动','联通','电信')
 )A
 INNER JOIN ( select 
@@ -50,8 +50,8 @@ AND event_type='cntrl'
 AND (arg1 = "Page_Video_Button-TBNetStatistic")
 AND ds = '20180810' 
 AND app_version='7.11.5.5'
-AND province in ('浙江省','广东省','贵州省')
-AND school in ('移动','联通','电信')
+AND province in ('bbb','暗黑','暗黑')
+AND school in ('暗黑','暗黑','暗黑')
 
 
 )B ON (A.play_token = B.play_token) group by A.province ,A.school ;
