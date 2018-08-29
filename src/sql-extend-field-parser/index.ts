@@ -1,18 +1,5 @@
-import { IToken } from '../lexer/token';
-import {
-  chain,
-  ChainNode,
-  createParser,
-  many,
-  matchNumber,
-  matchString,
-  matchWord,
-  optional,
-  plus,
-  Scanner
-} from '../parser';
+import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
-import { createFourOperations } from '../sql-parser/four-operations';
 import { sqlTokenizer } from '../sql-parser/languages';
 import { getAstFromArray, reversalAst } from './utils';
 
@@ -34,10 +21,8 @@ const mulExpression = () =>
     return getAstFromArray(ast);
   });
 
-const mulOperator = () => chain(['*', '/'])(ast => ast[0]);
-
 const mulFactor = () =>
-  chain([numberChain, functionCall, wordChain, chain('(', addExpression, ')')(ast => ast[1])])(ast => {
+  chain([matchNumber, functionCall, matchWord, chain('(', addExpression, ')')(ast => ast[1])])(ast => {
     return ast[0];
   });
 
@@ -62,7 +47,7 @@ const logicalExpression = () =>
     return { type: 'expression', variant: 'compare', operator: ast[1][0], left: ast[1], right: ast[1][1] };
   });
 
-const andOperator = () => chain(['AND', 'OR'])(ast => ast[0]);
+const andOperator = () => chain(['and', 'or'])(ast => ast[0]);
 
 // --------------------- function call ----------------------------
 
@@ -73,21 +58,10 @@ const functionCall = () =>
 
 // --------------------- case expression ----------------------------
 
-const caseExpression = () => chain('case', optional(wordChain), plus(whenExpression), elseExpression, 'end')();
+const caseExpression = () => chain('case', optional(matchWord), plus(whenExpression), elseExpression, 'end')();
 
-const whenExpression = () => chain('when', logicalExpression, 'then', [wordChain, numberChain, stringChain])();
+const whenExpression = () => chain('when', logicalExpression, 'then', [matchWord, matchNumber, matchString])();
 
-const elseExpression = () => chain('else', [numberChain, stringChain, wordChain])();
-
-// --------------------- terminals ----------------------------
-
-// field
-const wordChain = () => chain(matchWord)(ast => ast[0]);
-
-// string
-const stringChain = () => chain(matchString)(ast => ast[0]);
-
-// number
-const numberChain = () => chain(matchNumber)(ast => ast[0]);
+const elseExpression = () => chain('else', [matchNumber, matchString, matchWord])();
 
 export const parser = createParser(root, sqlTokenizer);

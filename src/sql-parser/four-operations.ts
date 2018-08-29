@@ -1,4 +1,4 @@
-import { Chain, chain, ChainNodeFactory, optional } from '../parser';
+import { chain, ChainNodeFactory, optional } from '../parser';
 
 // Four operations ---------------------------------
 export function createFourOperations(field: () => ChainNodeFactory) {
@@ -10,7 +10,7 @@ export function createFourOperations(field: () => ChainNodeFactory) {
 
   const termTail = () => chain(optional(chain(mulOp, factor, termTail)()))();
 
-  const mulOp = () => chain(['*', '/', '%', 'MOD', 'DIV'])(ast => ast[0]);
+  const mulOp = () => chain(['*', '/', '%'])(ast => ast[0]);
 
   const addOp = () => chain(['+', '-'])(ast => ast[0]);
 

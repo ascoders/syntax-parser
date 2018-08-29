@@ -1,12 +1,7 @@
-import { IToken } from '../lexer/token';
-import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus, Scanner } from '../parser';
+import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './languages';
-
-const unaryOperator = ['!', '~', '+', '-', 'NOT'];
-const bitOperator = ['<<', '>>', '&', '^', '|'];
-const mathOperator = ['*', '/', '%', 'DIV', 'MOD', '+', '-', '--'];
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
@@ -259,7 +254,7 @@ const fieldForIndex = () => chain(matchString, optional(['ASC', 'DESC']))();
 
 const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
 
-// ----------------------------------- Terminals -----------------------------------
+// ----------------------------------- others -----------------------------------
 
 const stringOrWord = () => chain([matchWord, matchString])(ast => ast[0]);
 

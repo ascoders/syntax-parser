@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { sqlParse } from '../src';
+import { parser } from '../src/sql-extend-field-parser';
 
 class Props {}
 
@@ -7,7 +7,7 @@ class State {}
 
 function parseExtendFieldString(str: string, offset: number) {
   const startTime = new Date();
-  const result = sqlParse(str, offset);
+  const result = parser(str, offset);
   const endTime = new Date();
 
   // tslint:disable-next-line:no-console
