@@ -1,5 +1,3 @@
-const validateText = `[a-zA-Z0-9_\u4e00-\u9fa5]`;
-
 const reservedWords = [
   'ACCESSIBLE',
   'ACTION',
@@ -319,68 +317,18 @@ const reservedNewlineWords = [
   'XOR'
 ];
 
-const stringTypes = [`""`, "N''", "''", '``', '[]'];
-
-const indentRegex = '[a-zA-Z0-9._$:]+';
-
-const openParens = ['(', 'CASE'];
-
-const closeParens = [')', 'END'];
-
-const indexedPlaceholderTypes = ['?'];
-
-const namedPlaceholderTypes = []; // [':', '.']
-
-const wordChars = [`${validateText}+`];
-
-const lineCommentTypes = ['#', '--'];
-
-interface ITokenConfig {
-  reservedWords?: string[];
-  reservedToplevelWords?: string[];
-  reservedNewlineWords?: string[];
-  stringTypes?: string[];
-  indentRegex?: string;
-  openParens?: string[];
-  closeParens?: string[];
-  indexedPlaceholderTypes?: string[];
-  namedPlaceholderTypes?: string[];
-  wordChars?: string[];
-  lineCommentTypes?: string[];
-}
+const validateText = `[a-zA-Z0-9_\u4e00-\u9fa5]`;
 
 export class Language {
-  public extendTokenConfig: ITokenConfig;
-
   public reservedWords: string[] = reservedWords;
   public reservedToplevelWords: string[] = reservedToplevelWords;
   public reservedNewlineWords: string[] = reservedNewlineWords;
-  public stringTypes: string[] = stringTypes;
-  public indentRegex: string = indentRegex;
-  public openParens: string[] = openParens;
-  public closeParens: string[] = closeParens;
-  public indexedPlaceholderTypes: string[] = indexedPlaceholderTypes;
+  public stringTypes: string[] = [`""`, "N''", "''", '``', '[]'];
+  public indentRegex: string = '[a-zA-Z0-9._$:]+';
+  public openParens: string[] = ['(', 'CASE'];
+  public closeParens: string[] = [')', 'END'];
+  public indexedPlaceholderTypes: string[] = ['?'];
   public namedPlaceholderTypes: string[] = [];
-  public wordChars: string[] = wordChars;
-  public lineCommentTypes: string[] = lineCommentTypes;
-
-  constructor(extendTokenConfig: ITokenConfig = {}) {
-    this.extendTokenConfig = extendTokenConfig;
-
-    Object.keys(extendTokenConfig).forEach(key => {
-      // @ts-ignore
-      this.extends(key, extendTokenConfig[key]);
-    });
-  }
-
-  private extends(key: string, content: string | string[]) {
-    // @ts-ignore
-    if (Array.isArray(this[key])) {
-      // @ts-ignore
-      this[key] = this[key].concat(content);
-    } else {
-      // @ts-ignore
-      this[key] = content;
-    }
-  }
+  public wordChars: string[] = [`${validateText}+`, `\\$\\{${validateText}+\\}`];
+  public lineCommentTypes: string[] = ['#', '--'];
 }

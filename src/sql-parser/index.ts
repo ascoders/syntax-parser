@@ -1,5 +1,4 @@
 import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus } from '../parser';
-import { binaryRecursionToArray } from '../parser/utils';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './languages';
 

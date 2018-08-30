@@ -1,7 +1,7 @@
-import { chain, ChainNodeFactory, optional } from '../parser';
+import { chain, ChainFunction, optional } from '../parser';
 
 // Four operations ---------------------------------
-export function createFourOperations(field: () => ChainNodeFactory) {
+export function createFourOperations(field: ChainFunction) {
   const addExpr = () => chain(term, exprTail)();
 
   const exprTail = () => chain(optional(chain(addOp, term, exprTail)()))();

@@ -34,7 +34,7 @@ export class Tokenizer {
    */
   constructor(cfg: any) {
     this.WHITESPACE_REGEX = /^(\s+)/;
-    this.NUMBER_REGEX = /^((-\s*)?[0-9]+(\.[0-9]+)?|0x[0-9a-fA-F]+|0b[01]+)\b/;
+    this.NUMBER_REGEX = /^([0-9]+(\.[0-9]+)?|0x[0-9a-fA-F]+|0b[01]+)\b/; // Ignore negative.
     this.OPERATOR_REGEX = /^(!=|<>|==|<=|>=|!<|!>|\|\||::|->>|->|~~\*|~~|!~~\*|!~~|~\*|!~\*|!~|.)/;
 
     this.BLOCK_COMMENT_REGEX = /^(\/\*[^]*?(?:\*\/|$))/;
@@ -157,30 +157,6 @@ export class Tokenizer {
     }
     const typesRegex = types.map(escapeRegExp).join('|');
     return new RegExp(`^((?:${typesRegex})(?:${pattern}))`);
-  }
-
-  private createStartEndPlaceholderRegex(types: string[], pattern: string) {
-    if (isEmpty(types)) {
-      return false;
-    }
-
-    const startRegex = types
-      .map(type => {
-        const [start, __] = type;
-        return start;
-      })
-      .map(escapeRegExp)
-      .join('|');
-
-    const endRegex = types
-      .map(type => {
-        const [__, end] = type;
-        return end;
-      })
-      .map(escapeRegExp)
-      .join('|');
-
-    return new RegExp(`^((?:${startRegex}))(?:${pattern})(${endRegex})`);
   }
 
   private getWhitespaceToken(input: string) {
@@ -340,26 +316,6 @@ export class Tokenizer {
 
       if (matches) {
         return { type, value: matches[1], key: null as string };
-      }
-    }
-  }
-
-  private getTokenOnFirstAndSecondMatch({
-    input,
-    type,
-    regex
-  }: {
-    input: string;
-    type: string;
-    regex: boolean | RegExp;
-  }) {
-    if (typeof regex === 'boolean') {
-      return null;
-    } else {
-      const matches = input.match(regex);
-
-      if (matches) {
-        return { type, value: matches[0], key: [matches[1], matches[2]] };
       }
     }
   }

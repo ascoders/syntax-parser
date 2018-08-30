@@ -28,7 +28,7 @@ FROM
          to_char(ope.gmt_create, 'yyyy-mm-dd') AS 日期
     FROM cnods.s_td_operation_delta ope
     WHERE ope.oper_code = 'courierArrive'
-    GROUP BY  to_char(ope.gmt_create
+    GROUP BY  to_char(ope.gmt_create)) a
     `);
   }
 

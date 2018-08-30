@@ -19,7 +19,7 @@
     "asbuild": "npm run asbuild:untouched && npm run asbuild:optimized"
   },
   "devDependencies": {
-    "pri": "^0.11.18"
+    "pri": "^0.12.1"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
@@ -28,6 +28,6 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
-    "@babel/runtime": "7.0.0-beta.56"
+    "@babel/runtime": "^7.0.0"
   }
 }

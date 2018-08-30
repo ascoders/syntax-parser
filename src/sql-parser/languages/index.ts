@@ -1,13 +1,10 @@
 import { Tokenizer } from '../../lexer';
 import { IToken } from '../../lexer/token';
-import { blink } from './blink';
-import { fbi } from './fbi';
-import { Language } from './Language';
-import { normal } from './normal';
+import { Language } from './language';
 
 export type TokenizerFactory = (text: string) => IToken[];
 
 export const sqlTokenizer: TokenizerFactory = sqlText => {
-  const tokenizer = new Tokenizer(fbi);
+  const tokenizer = new Tokenizer(new Language());
   return tokenizer.tokenize(sqlText);
 };
