@@ -199,11 +199,7 @@ const ast = myParser('a + b - (c+d)');
 
 ### Sql parser
 
-`sqlParse` is a built-in case, it's easy to build your custom sql parser, but for easy to use, we provide one.
-
-```bash
-npm i cparser
-```
+`sqlParse` is a built-in case.
 
 ```typescript
 import { sqlParser } from 'cparser';
