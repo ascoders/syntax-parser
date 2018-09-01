@@ -1,4 +1,4 @@
-import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus } from '../parser';
+import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
 import { sqlTokenizer } from '../sql-parser/languages';
 import { getAstFromArray, reversalAst } from './utils';
@@ -22,7 +22,12 @@ const mulExpression = () =>
   });
 
 const mulFactor = () =>
-  chain([matchNumber, functionCall, matchWord, chain('(', addExpression, ')')(ast => ast[1])])(ast => {
+  chain([
+    matchTokenType('number'),
+    functionCall,
+    matchTokenType('word'),
+    chain('(', addExpression, ')')(ast => ast[1])
+  ])(ast => {
     return ast[0];
   });
 
@@ -52,16 +57,23 @@ const andOperator = () => chain(['and', 'or'])(ast => ast[0]);
 // --------------------- function call ----------------------------
 
 const functionCall = () =>
-  chain(matchWord, '(', [addExpression, caseExpression], ')')(ast => {
+  chain(matchTokenType('word'), '(', [addExpression, caseExpression], ')')(ast => {
     return { type: 'expression', variant: 'functioncall', name: ast[0], arguments: ast[2] };
   });
 
 // --------------------- case expression ----------------------------
 
-const caseExpression = () => chain('case', optional(matchWord), plus(whenExpression), elseExpression, 'end')();
+const caseExpression = () =>
+  chain('case', optional(matchTokenType('word')), plus(whenExpression), elseExpression, 'end')();
 
-const whenExpression = () => chain('when', logicalExpression, 'then', [matchWord, matchNumber, matchString])();
+const whenExpression = () =>
+  chain('when', logicalExpression, 'then', [
+    matchTokenType('word'),
+    matchTokenType('number'),
+    matchTokenType('string')
+  ])();
 
-const elseExpression = () => chain('else', [matchNumber, matchString, matchWord])();
+const elseExpression = () =>
+  chain('else', [matchTokenType('number'), matchTokenType('string'), matchTokenType('word')])();
 
 export const parser = createParser(root, sqlTokenizer);

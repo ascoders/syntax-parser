@@ -1,4 +1,4 @@
-import { chain, createParser, many, matchNumber, matchString, matchWord, optional, plus } from '../parser';
+import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './languages';
 
@@ -94,13 +94,13 @@ const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
 const tableOption = () => chain(stringOrWord, dataType)();
 
-const tableName = () => chain([matchWord, chain(matchWord, '.', matchWord)()])();
+const tableName = () => chain([matchTokenType('word'), chain(matchTokenType('word'), '.', matchTokenType('word'))()])();
 
 // ----------------------------------- Having --------------------------------------------------
 const havingStatement = () => chain('having', expression)();
 
 // ----------------------------------- Create view statement -----------------------------------
-const createViewStatement = () => chain('create', 'view', matchWord, 'as', selectStatement)();
+const createViewStatement = () => chain('create', 'view', matchTokenType('word'), 'as', selectStatement)();
 
 // ----------------------------------- Insert statement -----------------------------------
 const insertStatement = () =>
@@ -108,7 +108,7 @@ const insertStatement = () =>
 
 const selectFieldsInfo = () => chain('(', selectFields, ')')();
 
-const selectFields = () => chain(matchWord, many(',', matchWord))();
+const selectFields = () => chain(matchTokenType('word'), many(',', matchTokenType('word')))();
 
 // ----------------------------------- groupBy -----------------------------------
 const groupByStatement = () => chain('group', 'by', fieldList)();
@@ -122,7 +122,11 @@ const orderByExpression = () => chain(expression, optional(['asc', 'desc']))();
 
 // ----------------------------------- limit -----------------------------------
 const limitClause = () =>
-  chain('limit', [matchNumber, chain(matchNumber, ',', matchNumber)(), chain(matchNumber, 'offset', matchNumber)()])();
+  chain('limit', [
+    matchTokenType('number'),
+    chain(matchTokenType('number'), ',', matchTokenType('number'))(),
+    chain(matchTokenType('number'), 'offset', matchTokenType('number'))()
+  ])();
 
 // ----------------------------------- Function -----------------------------------
 const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
@@ -133,13 +137,18 @@ const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])(
 
 const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
-const castFunction = () => chain('cast', '(', matchWord, 'as', dataType, ')')();
+const castFunction = () => chain('cast', '(', matchTokenType('word'), 'as', dataType, ')')();
 
-const normalFunction = () => chain(matchWord, '(', optional(functionFields), ')')();
+const normalFunction = () => chain(matchTokenType('word'), '(', optional(functionFields), ')')();
 
 // ----------------------------------- Case -----------------------------------
 const caseStatement = () =>
-  chain('case', plus(caseAlternative), optional('else', [matchString, 'null', matchNumber]), 'end')();
+  chain(
+    'case',
+    plus(caseAlternative),
+    optional('else', [matchTokenType('string'), 'null', matchTokenType('number')]),
+    'end'
+  )();
 
 const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
@@ -245,19 +254,20 @@ const field = () => createFourOperations(fieldItem)();
 // ----------------------------------- create index expression -----------------------------------
 const indexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
 
-const indexItem = () => chain(matchString, many('.', matchString))();
+const indexItem = () => chain(matchTokenType('string'), many('.', matchTokenType('string')))();
 
-const onStatement = () => chain('ON', matchString, '(', fieldForIndexList, ')')();
+const onStatement = () => chain('ON', matchTokenType('string'), '(', fieldForIndexList, ')')();
 
-const fieldForIndex = () => chain(matchString, optional(['ASC', 'DESC']))();
+const fieldForIndex = () => chain(matchTokenType('string'), optional(['ASC', 'DESC']))();
 
 const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
 
 // ----------------------------------- others -----------------------------------
 
-const stringOrWord = () => chain([matchWord, matchString])(ast => ast[0]);
+const stringOrWord = () => chain([matchTokenType('word'), matchTokenType('string')])(ast => ast[0]);
 
-const stringOrWordOrNumber = () => chain([matchWord, matchString, matchNumber])(ast => ast[0]);
+const stringOrWordOrNumber = () =>
+  chain([matchTokenType('word'), matchTokenType('string'), matchTokenType('number')])(ast => ast[0]);
 
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 

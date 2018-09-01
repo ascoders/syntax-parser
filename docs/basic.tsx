@@ -22,13 +22,9 @@ export default class Page extends React.PureComponent<Props, State> {
     }
 
     parse(`
-    SELECT TABLE0.日期, TABLE0.总取件量, TABLE1.App取件量,concat(round(TABLE1.App取件量/TABLE0.总取件量 * 100,2),'%') as App占比
-FROM 
-    (SELECT COUNT(DISTINCT(ope.fulfil_task_id)) AS 总取件量,
-         to_char(ope.gmt_create, 'yyyy-mm-dd') AS 日期
-    FROM cnods.s_td_operation_delta ope
-    WHERE ope.oper_code = 'courierArrive'
-    GROUP BY  to_char(ope.gmt_create)) a
+    SELECT *
+FROM bananas
+WHERE 1!=2 AND color != 'blue' OR pees = crackers
     `);
   }
 

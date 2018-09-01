@@ -1,6 +1,5 @@
 import { IToken } from '../lexer/token';
-import tokenTypes from '../lexer/token-types';
-import { chain, ISolveAst } from './chain';
+import { chain } from './chain';
 import { Scanner } from './scanner';
 
 export interface IMatch {
@@ -56,19 +55,10 @@ export const match = createMatch((scanner, word: string | string[], isCostToken)
   matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
 );
 
-export const matchWord = createMatch((scanner, word, isCostToken) => {
-  return matchToken(scanner, token => token.type === tokenTypes.WORD, isCostToken);
-}, 'word')();
-
-export const matchString = createMatch(
-  (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.STRING, isCostToken),
-  'string'
-)();
-
-export const matchNumber = createMatch(
-  (scanner, compare, isCostToken) => matchToken(scanner, token => token.type === tokenTypes.NUMBER, isCostToken),
-  'number'
-)();
+export const matchTokenType = (tokenType: string) =>
+  createMatch((scanner, word, isCostToken) => {
+    return matchToken(scanner, token => token.type === tokenType, isCostToken);
+  }, tokenType)();
 
 export const matchTrue = (): IMatch => ({
   token: null,

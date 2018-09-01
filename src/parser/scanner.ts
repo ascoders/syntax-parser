@@ -1,5 +1,4 @@
 import { IToken } from '../lexer/token';
-import tokenTypes from '../lexer/token-types';
 
 export class Scanner {
   private tokens: IToken[] = [];
@@ -7,13 +6,7 @@ export class Scanner {
 
   constructor(tokens: IToken[], index = 0) {
     // ignore whitespace, comment
-    this.tokens = tokens.filter(
-      token =>
-        token.type !== tokenTypes.WHITESPACE &&
-        token.type !== tokenTypes.COMMENT &&
-        token.type !== tokenTypes.LINE_COMMENT &&
-        token.type !== tokenTypes.BLOCK_COMMENT
-    );
+    this.tokens = tokens;
     this.index = index;
   }
 

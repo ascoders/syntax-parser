@@ -385,7 +385,8 @@ export const createParser = (root: ChainFunction, tokenizerFactory: TokenizerFac
     ast,
     callVisiterCount,
     nextMatchings: nextMatchings.reverse(),
-    error
+    error,
+    tokens
   };
 };
 
