@@ -1,4 +1,4 @@
-import { defaults, uniqBy } from 'lodash';
+import { defaults, set, uniqBy } from 'lodash';
 import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
 import { IMatch, match, matchFalse, matchTrue } from './match';
@@ -242,10 +242,7 @@ class VisiterStore {
   constructor(public scanner: Scanner, public version: number, public parser: Parser) {}
 }
 
-export const createParser = (root: ChainFunction, lexer: Lexer) => (
-  text: string,
-  cursorIndex = 0
-) => {
+export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string, cursorIndex = 0) => {
   const startTime = new Date();
 
   const tokens = lexer(text);
@@ -497,11 +494,7 @@ const callParentNode = tailCallOptimize(
     if (node.parentNode instanceof ChainNode) {
       if (visiterOption.generateAst) {
         if (node.parentNode.isPlus) {
-          if (node.parentNode.headIndex === 1) {
-            // TODO: 不用push，用具体下标，因为可能有回溯，回溯的时候用push可能导致结果不准确
-            node.parentNode.astResults.push([]);
-          }
-          node.parentNode.astResults[node.parentNode.astResults.length - 1][node.parentIndex] = astValue;
+          set(node.parentNode.astResults, `${node.parentNode.plusHeadIndex}.${node.parentIndex}`, astValue);
         } else {
           node.parentNode.astResults[node.parentIndex] = astValue;
         }

@@ -1,7 +1,7 @@
 import test from 'ava';
 import * as fs from 'fs';
 import * as path from 'path';
-import { sqlParse } from '../src';
+import { sqlParser } from '../src';
 
 const sqlTests: Array<{
   groupName: string;
@@ -36,7 +36,7 @@ sqlTests.forEach(sqlTest => {
   sqlTest.childs.forEach(eachTest => {
     test(`${sqlTest.groupName}.${eachTest.name}`, t => {
       // const result = sqlParse(eachTest.content);
-      const result = sqlParse('select a from b');
+      const result = sqlParser('select a from b');
       t.true(result.success);
     });
   });

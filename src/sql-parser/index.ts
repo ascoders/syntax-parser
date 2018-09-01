@@ -290,4 +290,4 @@ const selectSpec = () =>
     'sql_calc_found_rows'
   ])(ast => ast[0]);
 
-export const sqlParse = createParser(root, sqlTokenizer);
+export const sqlParser = createParser(root, sqlTokenizer);
