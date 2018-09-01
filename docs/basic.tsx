@@ -1,5 +1,26 @@
 import * as React from 'react';
-import { sqlParse } from '../src';
+import { createLexer, sqlParse } from '../src';
+
+const myTokenizer = createLexer([
+  {
+    type: 'whitespace',
+    regexes: [/^(\s+)/],
+    ignore: true
+  },
+  {
+    type: 'word',
+    regexes: [/^([a-zA-Z0-9]+)/]
+  },
+  {
+    type: 'operator',
+    regexes: [
+      /^(\(|\))/, // '(' ')'.
+      /^(\+|\-|\*|\/)/ // operators.
+    ]
+  }
+]);
+
+console.log(myTokenizer(`a + b - (c*d)`));
 
 class Props {}
 
@@ -11,14 +32,10 @@ export default class Page extends React.PureComponent<Props, State> {
 
   public componentDidMount() {
     function parse(str: string) {
-      const startTime = new Date();
-      const result = sqlParse(str, 10000);
-      const endTime = new Date();
-
       // tslint:disable-next-line:no-console
       console.log('sql:', str);
       // tslint:disable-next-line:no-console
-      console.log('parser time', endTime.getTime() - startTime.getTime(), 'ms', ', result', result);
+      console.log(sqlParse(str, 10000));
     }
 
     parse(`

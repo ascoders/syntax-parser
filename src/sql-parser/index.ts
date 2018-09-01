@@ -1,6 +1,6 @@
 import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
 import { createFourOperations } from './four-operations';
-import { sqlTokenizer } from './languages';
+import { sqlTokenizer } from './lexer';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 

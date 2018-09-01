@@ -9,7 +9,7 @@ interface ILexerConfig {
   ignore?: boolean;
 }
 
-export class Tokenizer {
+class Tokenizer {
   constructor(public lexerConfig: ILexerConfig[]) {}
 
   public tokenize(input: string) {
@@ -65,3 +65,8 @@ export class Tokenizer {
     }
   }
 }
+
+export type Lexer = (text: string) => IToken[];
+
+export const createLexer = (lexerConfig: ILexerConfig[]): Lexer => (text: string) =>
+  new Tokenizer(lexerConfig).tokenize(text);

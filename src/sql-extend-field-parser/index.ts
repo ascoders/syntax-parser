@@ -1,6 +1,6 @@
 import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
 import { binaryRecursionToArray } from '../parser/utils';
-import { sqlTokenizer } from '../sql-parser/languages';
+import { sqlTokenizer } from '../sql-parser/lexer';
 import { getAstFromArray, reversalAst } from './utils';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);

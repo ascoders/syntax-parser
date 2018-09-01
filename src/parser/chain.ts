@@ -1,6 +1,6 @@
 import { defaults, uniqBy } from 'lodash';
+import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
-import { TokenizerFactory } from '../sql-parser/languages';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 import { tailCallOptimize } from './utils';
@@ -242,11 +242,16 @@ class VisiterStore {
   constructor(public scanner: Scanner, public version: number, public parser: Parser) {}
 }
 
-export const createParser = (root: ChainFunction, tokenizerFactory: TokenizerFactory) => (
+export const createParser = (root: ChainFunction, lexer: Lexer) => (
   text: string,
   cursorIndex = 0
 ) => {
-  const tokens = tokenizerFactory(text);
+  const startTime = new Date();
+
+  const tokens = lexer(text);
+
+  const lexerTime = new Date();
+
   const scanner = new Scanner(tokens);
 
   let parser: Parser = null;
@@ -380,13 +385,19 @@ export const createParser = (root: ChainFunction, tokenizerFactory: TokenizerFac
     }
   }
 
+  const parserTime = new Date();
+
   return {
     success,
     ast,
     callVisiterCount,
     nextMatchings: nextMatchings.reverse(),
     error,
-    tokens
+    tokens,
+    costs: {
+      lexer: lexerTime.getTime() - startTime.getTime(),
+      parser: parserTime.getTime() - startTime.getTime()
+    }
   };
 };
 
