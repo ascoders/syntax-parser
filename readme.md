@@ -1,6 +1,6 @@
-# cparser
+# xparser
 
-cparser is a parser using pure javascript, so it can both run in browser and nodejs.
+xparser is a parser using pure javascript, so it can both run in browser and nodejs.
 
 It supports:
 
@@ -14,7 +14,7 @@ It supports:
 ### Example
 
 ```typescript
-import { createLexer } from 'cparser';
+import { createLexer } from 'xparser';
 
 const myLexer = createLexer([
   {
@@ -80,7 +80,7 @@ const tokens = myLexer('a + b - (c+d)');
 ### Example
 
 ```typescript
-import { createParser, chain, matchTokenType, many } from 'cparser';
+import { createParser, chain, matchTokenType, many } from 'xparser';
 
 // Grammer root ::= ( addExpr )
 //                | addExpr
@@ -202,7 +202,7 @@ const ast = myParser('a + b - (c+d)');
 `sqlParse` is a built-in case.
 
 ```typescript
-import { sqlParser } from 'cparser';
+import { sqlParser } from 'xparser';
 sqlParser('select * from table;');
 ```
 

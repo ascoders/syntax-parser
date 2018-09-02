@@ -1,5 +1,5 @@
 {
-  "name": "cparser",
+  "name": "xparser",
   "version": "0.1.0",
   "pri": {
     "type": "component"
