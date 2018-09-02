@@ -1,5 +1,5 @@
 {
-  "name": "xparser",
+  "name": "syntax-parser",
   "version": "0.1.0",
   "pri": {
     "type": "component"

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { parser } from '../src/sql-extend-field-parser';
+import { parser } from '../src/sql-extend-field-parser/parser';
 
 class Props {}
 
