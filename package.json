@@ -19,7 +19,7 @@
     "asbuild": "npm run asbuild:untouched && npm run asbuild:optimized"
   },
   "devDependencies": {
-    "pri": "^0.12.1"
+    "pri": "1.0.0-beta8"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
