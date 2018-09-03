@@ -1,4 +1,24 @@
-# syntax-parser
+<p align="center">
+    <h2 align="center">syntax-parser</h2>
+    <p align="center">
+        <i>
+            Dob is a tool for monitoring object changes. Using <a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy">Proxy</a>. <a target="_blank" href="https://dobjs.github.io/dob-docs/">Online Docs</a>.
+        </i>
+    <p>
+    <p align="center">
+        <i>
+            <a href="https://travis-ci.org/syntax-parser/syntax-parser">
+              <img src="https://img.shields.io/travis/syntax-parser/syntax-parser/master.svg?style=flat" alt="CircleCI Status">
+            </a>
+            <a href="https://www.npmjs.com/package/syntax-parser">
+              <img src="https://img.shields.io/npm/v/syntax-parser.svg?style=flat" alt="NPM Version">
+            </a>
+            <a href="https://codecov.io/github/syntax-parser/syntax-parser">
+              <img src="https://img.shields.io/codecov/c/github/syntax-parser/syntax-parser/master.svg" alt="Code Coverage">
+            </a>
+        </i>
+    </p>
+</p>
 
 syntax-parser is a parser using pure javascript, so it can both run in browser and nodejs.
 
