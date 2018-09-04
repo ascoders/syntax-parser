@@ -2,7 +2,7 @@
     <h2 align="center">syntax-parser</h2>
     <p align="center">
         <i>
-            Dob is a tool for monitoring object changes. Using <a target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy">Proxy</a>. <a target="_blank" href="https://dobjs.github.io/dob-docs/">Online Docs</a>.
+            syntax-parser is a parser using pure javascript, so it can both run in browser and nodejs.
         </i>
     <p>
     <p align="center">
@@ -19,8 +19,6 @@
         </i>
     </p>
 </p>
-
-syntax-parser is a parser using pure javascript, so it can both run in browser and nodejs.
 
 It supports:
 
