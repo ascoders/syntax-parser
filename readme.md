@@ -109,20 +109,16 @@ const addExpr = () =>
   chain(
     matchTokenType('word'),
     many(
-      chain(['+', '-'], root)(ast => {
-        return {
-          operator: ast[0].value,
-          term: ast[1]
-        };
-      })
+      chain(['+', '-'], root)(ast => ({
+        operator: ast[0].value,
+        term: ast[1]
+      }))
     )
-  )(ast => {
-    return {
-      left: ast[0].value,
-      operator: ast[1] && ast[1][0][0].operator,
-      right: ast[1] && ast[1][0][0].term
-    };
-  });
+  )(ast => ({
+    left: ast[0].value,
+    operator: ast[1] && ast[1][0][0].operator,
+    right: ast[1] && ast[1][0][0].term
+  }));
 
 const myParser = createParser(
   root, // Root grammar.
@@ -182,9 +178,7 @@ The last callback allow partial redefin of local ast:
 
 ```typescript
 chain('select', 'table')(
-  (
-    ast // ['select', 'table']
-  ) => ast[0] // return 'select'
+  ast => ast[0] // return 'select'
 );
 ```
 
