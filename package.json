@@ -1,8 +1,17 @@
 {
   "name": "syntax-parser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "pri": {
     "type": "component"
+  },
+  "ava": {
+    "compileEnhancements": false,
+    "extensions": [
+      "ts"
+    ],
+    "require": [
+      "@babel/register"
+    ]
   },
   "scripts": {
     "start": "pri dev",
@@ -30,6 +39,8 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
-    "@babel/runtime": "^7.0.0"
+    "@babel/register": "^7.0.0",
+    "@babel/runtime": "^7.0.0",
+    "ts-node": "^7.0.1"
   }
 }

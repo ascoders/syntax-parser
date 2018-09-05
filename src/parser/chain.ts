@@ -299,7 +299,9 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
       },
       onSuccess: () => {
         success = true;
-        ast = parser.rootChainNode.astResults;
+        ast = parser.rootChainNode.solveAst
+          ? parser.rootChainNode.solveAst(parser.rootChainNode.astResults)
+          : parser.rootChainNode.astResults;
       },
       onMatchNode: (matchNode, store, currentVisiterOption) => {
         const matchResult = matchNode.run(store.scanner);
