@@ -28,7 +28,7 @@ class Tokenizer {
         throw Error(`Unexpected string when lexer:\n${input}`);
       }
 
-      token.position = [lastPosition, lastPosition + token.value.length];
+      token.position = [lastPosition, lastPosition + token.value.length - 1];
       lastPosition += token.value.length;
 
       // Advance the string

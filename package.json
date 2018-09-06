@@ -4,15 +4,6 @@
   "pri": {
     "type": "component"
   },
-  "ava": {
-    "compileEnhancements": false,
-    "extensions": [
-      "ts"
-    ],
-    "require": [
-      "@babel/register"
-    ]
-  },
   "scripts": {
     "start": "pri dev",
     "docs": "pri docs",
@@ -23,14 +14,11 @@
     "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'",
     "prepublishOnly": "npm run build",
     "bundle": "pri bundle",
-    "asbuild:untouched": "asc assembly/index.ts -b build/untouched.wasm -t build/untouched.wat --sourceMap --validate",
-    "asbuild:optimized": "asc assembly/index.ts -b build/optimized.wasm -t build/optimized.wat --sourceMap --validate --optimize --noDebug",
-    "asbuild": "npm run asbuild:untouched && npm run asbuild:optimized",
     "release": "npm publish",
     "posttest": "codecov -f coverage/*.json -t dc6610f3-32ac-4d30-8676-74d3888349a0"
   },
   "devDependencies": {
-    "pri": "1.0.0-beta10"
+    "pri": "1.0.0-beta12"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
@@ -39,8 +27,13 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
+    "@babel/plugin-transform-typescript": "^7.0.0",
+    "@babel/preset-typescript": "^7.0.0",
     "@babel/register": "^7.0.0",
     "@babel/runtime": "^7.0.0",
+    "@types/jest": "^23.3.1",
+    "jest": "^23.5.0",
+    "ts-jest": "^23.1.4",
     "ts-node": "^7.0.1"
   }
 }

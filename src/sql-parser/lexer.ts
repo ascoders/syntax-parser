@@ -15,6 +15,10 @@ export const sqlTokenizer = createLexer([
     ignore: true
   },
   {
+    type: 'number',
+    regexes: [/^([0-9]+(\.[0-9]+)?|0x[0-9a-fA-F]+|0b[01]+)\b/]
+  },
+  {
     type: 'word',
     regexes: [
       /^([a-zA-Z0-9_\u4e00-\u9fa5]+)/, // word
@@ -28,10 +32,6 @@ export const sqlTokenizer = createLexer([
       /^((?=')(?:'[^'\\]*(?:\\[\s\S][^'\\]*)*'))/, // ''
       /^((?=`)(?:`[^`\\]*(?:\\[\s\S][^`\\]*)*`))/ // ``
     ]
-  },
-  {
-    type: 'number',
-    regexes: [/^([0-9]+(\.[0-9]+)?|0x[0-9a-fA-F]+|0b[01]+)\b/]
   },
   {
     type: 'special',
