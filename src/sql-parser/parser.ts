@@ -78,6 +78,7 @@ const tableSourceItem = () =>
     chain('(', tableSources, ')')()
   ])();
 
+
 const joinPart = () =>
   chain([
     chain(['inner', 'cross'], 'join', tableSourceItem, optional('on', expression))(),
@@ -159,7 +160,8 @@ const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])(
 
 const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
-const castFunction = () => chain('cast', '(', matchTokenType('word'), 'as', dataType, ')')();
+//  matchTokenType('word') ....
+const castFunction = () => chain('cast', '(', fieldItem, 'as', dataType, ')')();
 
 const normalFunction = () => chain(matchTokenType('word'), '(', optional(functionFields), ')')();
 
