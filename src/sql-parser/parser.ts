@@ -51,7 +51,10 @@ const whereStatement = () => chain('where', expression)(ast => ast[1]);
 //           | *
 const selectField = () =>
   chain([
-    chain([chain(many('not'), field)(), chain(many('not'), '(', field, ')')(), caseStatement], optional(alias))(),
+    chain(
+      [chain(many('not'), [field, chain('(', field, ')')()])(), chain(field, optional(overClause))(), caseStatement],
+      optional(alias)
+    )(),
     '*'
   ])();
 
@@ -119,6 +122,25 @@ const orderByClause = () => chain('order', 'by', orderByExpressionList)();
 const orderByExpressionList = () => chain(orderByExpression, many(',', orderByExpression))();
 
 const orderByExpression = () => chain(expression, optional(['asc', 'desc']))();
+
+/*
+<PARTITION BY clause> ::=  
+PARTITION BY value_expression , ... [ n ] 
+*/
+
+const partitionByClause = () => chain('partition', 'by', expression)(ast => ast);
+
+/*
+OVER (   
+       [ <PARTITION BY clause> ]  
+       [ <ORDER BY clause> ]   
+       [ <ROW or RANGE clause> ]  
+      )  
+*/
+const overClause = () => chain('over', '(', overTailExpression, ')')();
+
+const overTailExpression = () =>
+  chain([partitionByClause, chain(field, orderByClause)()], many(',', overTailExpression))();
 
 // ----------------------------------- limit -----------------------------------
 const limitClause = () =>
@@ -243,11 +265,9 @@ const isOrNotExpression = () =>
   ])();
 
 const fieldItem = () =>
-  chain([
-    functionChain,
-    chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(), // 字段
-    '*'
-  ])(ast => ast[0]);
+  chain([functionChain, chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(), '*'])(
+    ast => ast[0]
+  );
 
 const field = () => createFourOperations(fieldItem)();
 
@@ -267,7 +287,9 @@ const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))()
 const stringOrWord = () => chain([matchTokenType('word'), matchTokenType('string')])(ast => ast[0]);
 
 const stringOrWordOrNumber = () =>
-  chain([matchTokenType('word'), matchTokenType('string'), matchTokenType('number')])(ast => ast[0]);
+  chain([matchTokenType('word'), matchTokenType('string'), numberChain])(ast => ast[0]);
+
+const numberChain = () => chain(optional(['-', '+']), matchTokenType('number'))(ast => ast);
 
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
