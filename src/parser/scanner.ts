@@ -57,4 +57,14 @@ export class Scanner {
 
     return prevToken;
   };
+
+  public getNextTokenFromCharacterIndex = (characterIndex: number) => {
+    for (const token of this.tokens) {
+      if (token.position[0] > characterIndex) {
+        return token;
+      }
+    }
+
+    return null;
+  };
 }

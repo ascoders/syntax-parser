@@ -1,4 +1,4 @@
-import { defaults, set, uniqBy } from 'lodash';
+import { defaults, set, uniq, uniqBy } from 'lodash';
 import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
 import { IMatch, match, matchFalse, matchTrue } from './match';
@@ -265,7 +265,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   const cursorPrevToken = scanner.getPrevTokenFromCharacterIndex(cursorIndex);
 
   // If cursorPrevToken is null, the cursor prev node is root.
-  const cursorPrevNodes: Node[] = cursorPrevToken === null ? [parser.rootChainNode] : [];
+  let cursorPrevNodes: Node[] = cursorPrevToken === null ? [parser.rootChainNode] : [];
 
   let success: boolean = false;
   let ast: IAst = null;
@@ -341,14 +341,28 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     parser
   );
 
+  cursorPrevNodes = uniq(cursorPrevNodes);
+
   // Get next matchings
-  let nextMatchings = cursorPrevNodes.reduce(
+  let nextMatchNodes = cursorPrevNodes.reduce(
     (all, cursorPrevMatchNode) => {
-      return all.concat(findNextMatchNodes(cursorPrevMatchNode, parser).map(each => each.matching));
+      return all.concat(findNextMatchNodes(cursorPrevMatchNode, parser));
     },
-    [] as IMatching[]
+    [] as MatchNode[]
   );
-  nextMatchings = uniqBy(nextMatchings, each => each.type + each.value);
+
+  nextMatchNodes = uniqBy(nextMatchNodes, each => each.matching.type + each.matching.value);
+
+  // If has next token, see whether the double next match node match this next token.
+  const cursorNextToken = scanner.getNextTokenFromCharacterIndex(cursorIndex);
+
+  if (cursorNextToken) {
+    nextMatchNodes = nextMatchNodes.filter(nextMatchNode =>
+      findNextMatchNodes(nextMatchNode, parser).some(
+        nextNextMatchNode => nextNextMatchNode.matching.value === cursorNextToken.value
+      )
+    );
+  }
 
   // Get error message
   let error: {
@@ -390,7 +404,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     success,
     ast,
     callVisiterCount,
-    nextMatchings: nextMatchings.reverse(),
+    nextMatchings: nextMatchNodes.reverse().map(each => each.matching),
     error,
     tokens,
     costs: {

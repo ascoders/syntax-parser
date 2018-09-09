@@ -29,6 +29,14 @@ export default class Page extends React.PureComponent<Props, State> {
         height: 500
       });
 
+      editor.setValue(`select * from (
+        select * from (
+          select * from (
+            select a, b, c from d
+          ) c
+        ) b
+      ) a`);
+
       editor.onDidChangeModelContent((event: any) => {
         this.editVersion++;
         const currentEditVersion = this.editVersion;

@@ -68,7 +68,7 @@ const tableSources = () => chain(tableSource, many(',', tableSource))();
 const tableSource = () =>
   chain([
     chain(tableSourceItem, many(joinPart))(),
-    chain('(', tableSourceItem, many(joinPart), ')')()
+    chain('(', tableSourceItem, many(joinPart), ')')(),
   ])();
 
 const tableSourceItem = () =>
@@ -77,7 +77,6 @@ const tableSourceItem = () =>
     chain([selectStatement, chain('(', selectStatement, ')')()], alias)(),
     chain('(', tableSources, ')')()
   ])();
-
 
 const joinPart = () =>
   chain([
