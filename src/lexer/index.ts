@@ -22,11 +22,11 @@ class Tokenizer {
       // Get the next token and the token type
       const result = this.getNextToken(input);
 
-      token = result.token;
-
-      if (!token) {
-        throw Error(`Unexpected string when lexer:\n${input}`);
+      if (!result || !result.token) {
+        throw Error(`Lexer: Unexpected string "${input}"`);
       }
+
+      token = result.token;
 
       token.position = [lastPosition, lastPosition + token.value.length - 1];
       lastPosition += token.value.length;

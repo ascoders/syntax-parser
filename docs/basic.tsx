@@ -1,14 +1,70 @@
 import * as _ from 'lodash';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { sqlParser } from '../src';
+import { chain, createLexer, createParser, many, matchTokenType, sqlParser } from '../src';
+
+const myLexer = createLexer([
+  {
+    type: 'whitespace',
+    regexes: [/^(\s+)/],
+    ignore: true
+  },
+  {
+    type: 'word',
+    regexes: [/^([a-zA-Z0-9]+)/] // 解析数字
+  },
+  {
+    type: 'operator',
+    regexes: [
+      /^(\(|\))/, // 解析 ( )
+      /^(\+|\-|\*|\/)/ // 解析 + - * /
+    ]
+  }
+]);
+
+// const root = () => chain(term, many(addOp, root))(parseTermAst);
+
+// const term = () => chain(factor, many(mulOp, root))(parseTermAst);
+
+// const mulOp = () => chain(['*', '/'])(ast => ast[0].value);
+
+// const addOp = () => chain(['+', '-'])(ast => ast[0].value);
+
+// const factor = () =>
+//   chain([chain('(', root, ')')(ast => ast[1]), chain(matchTokenType('word'))(ast => ast[0].value)])(ast => ast[0]);
+
+const root = () => chain(matchTokenType('word'), many('+', matchTokenType('word')))();
+
+const myParser = createParser(
+  root, // Root grammar.
+  myLexer // Created in lexer example.
+);
+
+const parseTermAst = (ast: any) =>
+  ast[1]
+    ? ast[1].reduce(
+        (obj: any, next: any) =>
+          next[0]
+            ? {
+                operator: next[0],
+                left: obj || ast[0],
+                right: next[1]
+              }
+            : {
+                operator: next[1] && next[1].operator,
+                left: obj || ast[0],
+                right: next[1] && next[1].right
+              },
+        null
+      )
+    : ast[0];
 
 class Props {}
 
 class State {}
 
 const mockAsyncParser = async (text: string, index: number) => {
-  return Promise.resolve().then(() => sqlParser(text, index));
+  return Promise.resolve().then(() => myParser(text, index));
 };
 
 export default class Page extends React.PureComponent<Props, State> {
@@ -29,13 +85,13 @@ export default class Page extends React.PureComponent<Props, State> {
         height: 500
       });
 
-      editor.setValue(`select * from (
-        select * from (
-          select * from (
-            select a, b, c from d
-          ) c
-        ) b
-      ) a`);
+      // editor.setValue(`select * from (
+      //   select * from (
+      //     select * from (
+      //       select a, b, c from d
+      //     ) c
+      //   ) b
+      // ) a`);
 
       editor.onDidChangeModelContent((event: any) => {
         this.editVersion++;
