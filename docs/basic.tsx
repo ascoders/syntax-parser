@@ -7,31 +7,6 @@ class Props {}
 
 class State {}
 
-// test
-const testSql = `
-select 
-	ccw                        
-    ,ccd_ccd               
-	,case when bc_type in (1,2) then '暗黑破坏神'
-		  when bc_type = 0 then '暗黑破坏神' else 'null' end as bc_type
-    ,substr(regexp_replace(create_time,'-',''),1,8) as date_id
-    ,register_type
-	,punish_status_id
-from(
-select *  
-from cco_busi.dwd_tb_gm_visit_df
-where 
-ds = to_char(dateadd(getdate(),-1,'dd'),'yyyymmdd')
-)a 
-left outer join(
-select user_id as seller_id,ccd,bc_type from tbcdm.dim_tb_seller where ds = to_char(dateadd(getdate(),-1,'dd'),'yyyymmdd')
-)b 
-on cast(a.user_id as bigint)= b.seller_id
-`;
-
-const result = sqlParser(testSql);
-console.log(result);
-
 const mockAsyncParser = async (text: string, index: number) => {
   return Promise.resolve().then(() => sqlParser(text, index));
 };
@@ -63,6 +38,9 @@ export default class Page extends React.PureComponent<Props, State> {
             const model = editor.getModel();
 
             mockAsyncParser(editor.getValue(), model.getOffsetAt(editor.getPosition()) - 1).then(astResult => {
+              // tslint:disable-next-line:no-console
+              console.log(astResult);
+
               resolve(astResult);
 
               if (currentEditVersion !== this.editVersion) {
