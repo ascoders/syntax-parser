@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { chain, createLexer, createParser, many, matchTokenType, sqlParser } from '../src';
+import { chain, createLexer, createParser, many, matchTokenType, optional, sqlParser } from '../src';
 
 const myLexer = createLexer([
   {
@@ -22,9 +22,9 @@ const myLexer = createLexer([
   }
 ]);
 
-// const root = () => chain(term, many(addOp, root))(parseTermAst);
+// const root = () => chain(term, optional(addOp, root))(parseTermAst);
 
-// const term = () => chain(factor, many(mulOp, root))(parseTermAst);
+// const term = () => chain(factor, optional(mulOp, root))(parseTermAst);
 
 // const mulOp = () => chain(['*', '/'])(ast => ast[0].value);
 
@@ -33,7 +33,7 @@ const myLexer = createLexer([
 // const factor = () =>
 //   chain([chain('(', root, ')')(ast => ast[1]), chain(matchTokenType('word'))(ast => ast[0].value)])(ast => ast[0]);
 
-const root = () => chain(matchTokenType('word'), many('+', matchTokenType('word')))();
+const root = () => chain(matchTokenType('word'), optional('+', root))();
 
 const myParser = createParser(
   root, // Root grammar.
@@ -58,6 +58,10 @@ const parseTermAst = (ast: any) =>
         null
       )
     : ast[0];
+
+const res = myParser('1+1+1+1+1+');
+// tslint:disable-next-line:no-console
+console.log('res', res);
 
 class Props {}
 
@@ -102,6 +106,8 @@ export default class Page extends React.PureComponent<Props, State> {
             const model = editor.getModel();
 
             mockAsyncParser(editor.getValue(), model.getOffsetAt(editor.getPosition()) - 1).then(astResult => {
+              // tslint:disable-next-line:no-console
+              console.log('-----------------');
               // tslint:disable-next-line:no-console
               console.log(astResult);
 

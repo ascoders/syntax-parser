@@ -39,7 +39,7 @@ const MAX_VISITER_CALL = 10000000;
 
 class VisiterOption {
   public onCallVisiter?: (node?: Node) => void;
-  public onCallParentNode?: (node?: Node) => void;
+  public onVisiterNextNode?: (node?: Node) => void;
   public onSuccess?: () => void;
   public onFail?: (lastNode?: Node) => void;
   public generateAst?: boolean = true;
@@ -291,7 +291,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
           throw Error('call visiter more then ' + MAX_VISITER_CALL);
         }
       },
-      onCallParentNode: node => {
+      onVisiterNextNode: node => {
         callParentCount++;
         if (callParentCount > MAX_VISITER_CALL) {
           throw Error('call parent more then' + MAX_VISITER_CALL);
@@ -331,7 +331,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
             cursorPrevNodes.push(matchNode);
           }
 
-          callParentNode(matchNode, store, currentVisiterOption, matchResult.token);
+          visiterNextNode(matchNode, store, currentVisiterOption, matchResult.token);
         }
       },
       onFail: node => {
@@ -444,7 +444,8 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
     ) {
       const firstMatchNodes = store.parser.firstSet.get(node.functionName);
 
-      // If not match any first match node, set false
+      // If not match any first match node, set headIndex to false
+      // TODO: If not match any first match node, try chances
       if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
         node.headIndex = node.childs.length;
 
@@ -460,7 +461,7 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
       node.headIndex++;
       visiter(nextChild, store, visiterOption);
     } else {
-      callParentNode(node, store, visiterOption, visiterOption.generateAst ? node.solveAst(node.astResults) : null);
+      visiterNextNode(node, store, visiterOption, visiterOption.generateAst ? node.solveAst(node.astResults) : null);
     }
   } else if (node instanceof MatchNode) {
     visiterOption.onMatchNode(node, store, visiterOption);
@@ -489,11 +490,14 @@ const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption
   }
 });
 
-const callParentNode = tailCallOptimize(
+const visiterNextNode = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
-    if (visiterOption.onCallParentNode) {
-      visiterOption.onCallParentNode(node);
+    if (visiterOption.onVisiterNextNode) {
+      visiterOption.onVisiterNextNode(node);
     }
+
+    // TODO:
+    // console.log('visiterNextNode', node, store.restChances.length, store.scanner.getIndex());
 
     if (!node.parentNode) {
       // Finish matching!
@@ -516,7 +520,7 @@ const callParentNode = tailCallOptimize(
         }
       }
 
-      // If current node has isPlus, and run into callParentNode means it childs had match successful, so add a new chance.
+      // If current node has isPlus, and run into visiterNextNode means it childs had match successful, so add a new chance.
       // TODO: ast has bug.
       if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
         // console.log('!!!!!!!!call parent plus, add chance', node.parentNode);
@@ -530,7 +534,7 @@ const callParentNode = tailCallOptimize(
 
       visiter(node.parentNode, store, visiterOption);
     } else if (node.parentNode instanceof TreeNode) {
-      callParentNode(node.parentNode, store, visiterOption, astValue);
+      visiterNextNode(node.parentNode, store, visiterOption, astValue);
     } else {
       throw Error('Unexpected parent node type: ' + node.parentNode);
     }
@@ -613,7 +617,7 @@ function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
     enableFirstSet: false,
     onMatchNode: (matchNode, store, currentVisiterOption) => {
       if (matchNode.matching.type === 'loose' && matchNode.matching.value === true) {
-        callParentNode(matchNode, store, currentVisiterOption, null);
+        visiterNextNode(matchNode, store, currentVisiterOption, null);
       } else {
         nextMatchNodes.push(matchNode);
 
