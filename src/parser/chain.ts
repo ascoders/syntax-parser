@@ -71,7 +71,7 @@ class TreeNode {
   public parentNode: ParentNode;
   public childs: Node[] = [];
   // Current running child index.
-  public headIndex = 0;
+  public childIndex = 0;
 
   public version: number = null;
 
@@ -83,7 +83,7 @@ export class ChainNode {
   public childs: Node[] = [];
   public astResults?: IAst[] = [];
   // Current running child index.
-  public headIndex = 0;
+  public childIndex = 0;
 
   // Eg: const foo = chain => chain()(), so the chain functionName is 'foo'.
   public functionName: string = null;
@@ -232,7 +232,7 @@ function solveDirectLeftRecursion(elements: any[], parentFunctionName: string) {
 
 interface IChance {
   node: ParentNode;
-  headIndex: number;
+  childIndex: number;
   tokenIndex: number;
 }
 
@@ -419,76 +419,70 @@ function newVisiter(node: Node, version: number, scanner: Scanner, visiterOption
   defaults(visiterOption, defaultVisiterOption);
 
   const newStore = new VisiterStore(scanner, version, parser);
-  visiter(node, newStore, visiterOption);
+  visiter(node, newStore, visiterOption, 0);
 }
 
-const visiter = tailCallOptimize((node: Node, store: VisiterStore, visiterOption: VisiterOption) => {
-  if (!node) {
-    return false;
-  }
+const visiter = tailCallOptimize(
+  (node: Node, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) => {
+    if (!node) {
+      return false;
+    }
 
-  if (visiterOption.onCallVisiter) {
-    visiterOption.onCallVisiter(node);
-  }
+    if (visiterOption.onCallVisiter) {
+      visiterOption.onCallVisiter(node);
+    }
 
-  const currentTokenIndex = store.scanner.getIndex();
+    const currentTokenIndex = store.scanner.getIndex();
 
-  if (node instanceof ChainNode) {
-    resetHeadByVersion(node, store);
-    // If has first set, we can fail soon.
-    if (
-      visiterOption.enableFirstSet &&
-      node.functionName &&
-      node.headIndex === 0 &&
-      store.parser.firstSet.has(node.functionName)
-    ) {
-      const firstMatchNodes = store.parser.firstSet.get(node.functionName);
+    if (node instanceof ChainNode) {
+      // If has first set, we can fail soon.
+      if (
+        visiterOption.enableFirstSet &&
+        node.functionName &&
+        childIndex === 0 &&
+        store.parser.firstSet.has(node.functionName)
+      ) {
+        const firstMatchNodes = store.parser.firstSet.get(node.functionName);
 
-      // If not match any first match node, set headIndex to false
-      // TODO: If not match any first match node, try chances
-      if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
-        node.headIndex = node.childs.length;
-
-        tryChances(node, store, visiterOption);
-        return;
-      } else {
-        // first set success
+        // If not match any first match node, try chances
+        if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
+          tryChances(node, store, visiterOption);
+          return;
+        } else {
+          // first set success
+        }
       }
-    }
 
-    const nextChild = node.childs[node.headIndex];
-    if (nextChild) {
-      node.headIndex++;
-      visiter(nextChild, store, visiterOption);
+      const nextChild = node.childs[childIndex];
+      if (nextChild) {
+        visiter(nextChild, store, visiterOption, 0);
+      } else {
+        visiterNextNode(node, store, visiterOption, visiterOption.generateAst ? node.solveAst(node.astResults) : null);
+      }
+    } else if (node instanceof MatchNode) {
+      visiterOption.onMatchNode(node, store, visiterOption);
+    } else if (node instanceof TreeNode) {
+      const nextChild = node.childs[childIndex];
+      if (childIndex < node.childs.length - 1) {
+        store.restChances.push({
+          node,
+          tokenIndex: currentTokenIndex,
+          childIndex: childIndex + 1
+        });
+      }
+      if (nextChild) {
+        visiter(nextChild, store, visiterOption, 0);
+      }
+    } else if (node instanceof FunctionNode) {
+      const replacedNode = node.run();
+
+      node.parentNode.childs[node.parentIndex] = replacedNode;
+      visiter(replacedNode, store, visiterOption, 0);
     } else {
-      visiterNextNode(node, store, visiterOption, visiterOption.generateAst ? node.solveAst(node.astResults) : null);
+      throw Error('Unexpected node type: ' + node);
     }
-  } else if (node instanceof MatchNode) {
-    visiterOption.onMatchNode(node, store, visiterOption);
-  } else if (node instanceof TreeNode) {
-    resetHeadByVersion(node, store);
-
-    const nextChild = node.childs[node.headIndex];
-    if (node.headIndex < node.childs.length - 1) {
-      store.restChances.push({
-        node,
-        tokenIndex: currentTokenIndex,
-        headIndex: node.headIndex + 1
-      });
-    }
-    if (nextChild) {
-      node.headIndex++;
-      visiter(nextChild, store, visiterOption);
-    }
-  } else if (node instanceof FunctionNode) {
-    const replacedNode = node.run();
-
-    node.parentNode.childs[node.parentIndex] = replacedNode;
-    visiter(replacedNode, store, visiterOption);
-  } else {
-    throw Error('Unexpected node type: ' + node);
   }
-});
+);
 
 const visiterNextNode = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
@@ -522,17 +516,17 @@ const visiterNextNode = tailCallOptimize(
 
       // If current node has isPlus, and run into visiterNextNode means it childs had match successful, so add a new chance.
       // TODO: ast has bug.
-      if (node.parentNode.isPlus && node.parentNode.headIndex === node.parentNode.childs.length) {
+      if (node.parentNode.isPlus && node.parentIndex + 1 === node.parentNode.childs.length) {
         // console.log('!!!!!!!!call parent plus, add chance', node.parentNode);
         node.parentNode.plusHeadIndex++;
         store.restChances.push({
           node: node.parentNode,
-          headIndex: 0,
+          childIndex: 0,
           tokenIndex: store.scanner.getIndex()
         });
       }
 
-      visiter(node.parentNode, store, visiterOption);
+      visiter(node.parentNode, store, visiterOption, node.parentIndex + 1);
     } else if (node.parentNode instanceof TreeNode) {
       visiterNextNode(node.parentNode, store, visiterOption, astValue);
     } else {
@@ -560,45 +554,15 @@ function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOptio
   // reset scanner index
   store.scanner.setIndex(recentChance.tokenIndex);
 
-  // reset node headIndex
-  recentChance.node.headIndex = recentChance.headIndex;
+  // reset node childIndex
+  recentChance.node.childIndex = recentChance.childIndex;
 
   // reset parent node's index
   recentChance.node.version = store.version;
 
-  // console.log('tryChances', recentChance.node, recentChance.tokenIndex, recentChance.headIndex);
-
-  resetParentsHeadIndexAndVersion(recentChance.node, store.version);
-
-  visiter(recentChance.node, store, visiterOption);
+  visiter(recentChance.node, store, visiterOption, recentChance.childIndex);
 }
 
-function resetHeadByVersion(node: ParentNode, store: VisiterStore) {
-  if (node.version !== store.version) {
-    // If version not equal, reset headIndex
-    node.version = store.version;
-    node.headIndex = 0;
-    // 清空astResults
-    if (node instanceof ChainNode) {
-      node.astResults = [];
-    }
-  }
-}
-
-// chain(mulExp, many(mulOp, mulExp)), 假设现在在many里面的mulExp里面，那么此时其实是可以回到many的第一个节点mulOp的，这里是直接移到后面去了应该
-const resetParentsHeadIndexAndVersion = tailCallOptimize((node: Node, version: number) => {
-  if (node.parentNode) {
-    node.parentNode.headIndex = node.parentIndex + 1;
-
-    // Be sure not overflow more than one.
-    if (node.parentNode.headIndex > node.parentNode.childs.length) {
-      node.parentNode.headIndex = node.parentNode.childs.length;
-    }
-
-    node.parentNode.version = version;
-    resetParentsHeadIndexAndVersion(node.parentNode, version);
-  }
-});
 
 // find all tokens that may appear next
 function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
@@ -608,7 +572,6 @@ function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
   }
 
   const newVersion = parser.getNewVersion();
-  resetParentsHeadIndexAndVersion(node, newVersion);
 
   const nextMatchNodes: MatchNode[] = [];
 
