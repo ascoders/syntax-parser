@@ -4,12 +4,17 @@ import { sqlTokenizer } from './lexer';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
-const statements = () => chain(statement, many(';', statement))();
+const statements = () => chain(statement, optional(';', statements))();
 
 const statement = () =>
-  chain([selectStatement, createTableStatement, insertStatement, createViewStatement, setStatement, indexStatement])(
-    ast => ast[0]
-  );
+  chain([
+    selectStatement,
+    createTableStatement,
+    insertStatement,
+    createViewStatement,
+    setStatement,
+    createIndexStatement
+  ])(ast => ast[0]);
 
 // ----------------------------------- select statement -----------------------------------
 
@@ -273,7 +278,7 @@ const fieldItem = () =>
 const field = () => createFourOperations(fieldItem)();
 
 // ----------------------------------- create index expression -----------------------------------
-const indexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
+const createIndexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
 
 const indexItem = () => chain(matchTokenType('string'), many('.', matchTokenType('string')))();
 

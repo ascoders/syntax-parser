@@ -8,12 +8,10 @@ import { tailCallOptimize } from './utils';
 const parserMap = new Map<ChainFunction, Parser>();
 
 class Parser {
-  public version = 0;
   public rootChainNode: ChainNode = null;
   public firstSet = new Map<string, MatchNode[]>();
   public firstOrFunctionSet = new Map<string, FirstOrFunctionSet[]>();
   public relatedSet = new Map<string, Set<string>>();
-  public getNewVersion = () => ++this.version;
 }
 
 type FirstOrFunctionSet = MatchNode | string;
@@ -42,9 +40,10 @@ class VisiterOption {
   public onVisiterNextNode?: (node?: Node) => void;
   public onSuccess?: () => void;
   public onFail?: (lastNode?: Node) => void;
-  public generateAst?: boolean = true;
   public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
+  public generateAst?: boolean = true;
   public enableFirstSet?: boolean = true;
+  public generateNextMatchNodes?: boolean = true;
 }
 
 class MatchNode {
@@ -70,10 +69,12 @@ export class FunctionNode {
 class TreeNode {
   public parentNode: ParentNode;
   public childs: Node[] = [];
-  // Current running child index.
-  public childIndex = 0;
 
-  public version: number = null;
+  // Performance optimization. Quickly find next matchNode.
+  public nextMatchNodes: Array<{
+    matchNode: MatchNode | boolean;
+    nextChances: IChance[];
+  }> = [];
 
   constructor(public parentIndex: number) {}
 }
@@ -81,17 +82,19 @@ class TreeNode {
 export class ChainNode {
   public parentNode: ParentNode;
   public childs: Node[] = [];
+
+  // The length is childs.length+1, so may be not necessary to call findNextMatchNode.
+  public nextMatchNodes: Array<{
+    matchNode: MatchNode | boolean;
+    nextChances: IChance[];
+  }> = [];
+
   public astResults?: IAst[] = [];
-  // Current running child index.
-  public childIndex = 0;
 
   // Eg: const foo = chain => chain()(), so the chain functionName is 'foo'.
   public functionName: string = null;
 
   public solveAst: ISolveAst = null;
-
-  // When try new tree chance, set tree node and it's parent chain node a new version, so all child visiter will reset headIndex if version if different.
-  public version: number = null;
 
   // Enable match plus times.
   public isPlus = false;
@@ -196,13 +199,11 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
     chainNode.functionName = functionName;
     chainNode.solveAst = solveAst;
 
-    elements = solveDirectLeftRecursion(elements, functionName);
-
     chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, index, parser));
 
-    if (functionName) {
-      generateFirstSet(chainNode, parser);
-    }
+    // if (functionName) {
+    //   generateFirstSet(chainNode, parser);
+    // }
 
     return chainNode;
   };
@@ -210,25 +211,6 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
 
   return chainNodeFactory;
 };
-
-/**
- * Solve direct left recursion.
- * a -> a + b
- *    | a + c
- *    | d
- *    | e
- * ===
- * a -> (d | e) ((+ b) | (+ c))*
- */
-function solveDirectLeftRecursion(elements: any[], parentFunctionName: string) {
-  const leftRecursionElements = elements.filter(element => element.name === parentFunctionName);
-  const normalElements = elements.filter(element => element.name !== parentFunctionName);
-
-  // TODO:
-  // console.log(leftRecursionElements, normalElements);
-
-  return elements;
-}
 
 interface IChance {
   node: ParentNode;
@@ -238,8 +220,12 @@ interface IChance {
 
 class VisiterStore {
   public restChances: IChance[] = [];
+  public nextMatchNodeFinders = new Set<{
+    node: ParentNode;
+    childIndex: number;
+  }>();
 
-  constructor(public scanner: Scanner, public version: number, public parser: Parser) {}
+  constructor(public scanner: Scanner, public parser: Parser) {}
 }
 
 export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string, cursorIndex = 0) => {
@@ -277,11 +263,8 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     token: IToken;
   } = null;
 
-  const newVersion = parser.getNewVersion();
-
   newVisiter(
     parser.rootChainNode,
-    newVersion,
     scanner,
     {
       onCallVisiter: node => {
@@ -307,31 +290,27 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
         const matchResult = matchNode.run(store.scanner);
 
         if (!matchResult.match) {
-          // console.log('xxxxxxx', matchResult.token && matchResult.token.value, matchNode.matching);
           tryChances(matchNode, store, currentVisiterOption);
         } else {
           const restTokenCount = store.scanner.getRestTokenCount();
-          if (matchNode.matching.type !== 'loose') {
-            // Last match at least token remaining, is the most readable reason for error.
-            if (
-              !lastMatchUnderShortestRestToken ||
-              (lastMatchUnderShortestRestToken && lastMatchUnderShortestRestToken.restTokenCount > restTokenCount)
-            ) {
-              lastMatchUnderShortestRestToken = {
-                matchNode,
-                token: matchResult.token,
-                restTokenCount
-              };
-            }
+          // Last match at least token remaining, is the most readable reason for error.
+          if (
+            !lastMatchUnderShortestRestToken ||
+            (lastMatchUnderShortestRestToken && lastMatchUnderShortestRestToken.restTokenCount > restTokenCount)
+          ) {
+            lastMatchUnderShortestRestToken = {
+              matchNode,
+              token: matchResult.token,
+              restTokenCount
+            };
           }
 
-          // console.log('ooooooo', matchResult.token && matchResult.token.value, matchNode.matching);
           // If cursor prev token isn't null, it may a cursor prev node.
           if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
             cursorPrevNodes.push(matchNode);
           }
 
-          visiterNextNode(matchNode, store, currentVisiterOption, matchResult.token);
+          visiterNextNodeFromParent(matchNode, store, currentVisiterOption, matchResult.token);
         }
       },
       onFail: node => {
@@ -401,6 +380,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   const parserTime = new Date();
 
   return {
+    rootChainNode: parser.rootChainNode,
     success,
     ast,
     callVisiterCount,
@@ -414,64 +394,62 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   };
 };
 
-function newVisiter(node: Node, version: number, scanner: Scanner, visiterOption: VisiterOption, parser: Parser) {
+function newVisiter(node: Node, scanner: Scanner, visiterOption: VisiterOption, parser: Parser) {
   const defaultVisiterOption = new VisiterOption();
   defaults(visiterOption, defaultVisiterOption);
 
-  const newStore = new VisiterStore(scanner, version, parser);
+  const newStore = new VisiterStore(scanner, parser);
   visiter(node, newStore, visiterOption, 0);
 }
 
 const visiter = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) => {
     if (!node) {
-      return false;
+      throw Error('no node!');
     }
 
     if (visiterOption.onCallVisiter) {
       visiterOption.onCallVisiter(node);
     }
 
-    const currentTokenIndex = store.scanner.getIndex();
-
     if (node instanceof ChainNode) {
       // If has first set, we can fail soon.
-      if (
-        visiterOption.enableFirstSet &&
-        node.functionName &&
-        childIndex === 0 &&
-        store.parser.firstSet.has(node.functionName)
-      ) {
-        const firstMatchNodes = store.parser.firstSet.get(node.functionName);
+      // if (
+      //   visiterOption.enableFirstSet &&
+      //   node.functionName &&
+      //   childIndex === 0 &&
+      //   store.parser.firstSet.has(node.functionName)
+      // ) {
+      //   const firstMatchNodes = store.parser.firstSet.get(node.functionName);
 
-        // If not match any first match node, try chances
-        if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
-          tryChances(node, store, visiterOption);
-          return;
-        } else {
-          // first set success
-        }
-      }
+      //   // If not match any first match node, try chances
+      //   if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
+      //     tryChances(node, store, visiterOption);
+      //     return;
+      //   } else {
+      //     // first set success
+      //   }
+      // }
 
-      const nextChild = node.childs[childIndex];
-      if (nextChild) {
-        visiter(nextChild, store, visiterOption, 0);
-      } else {
-        visiterNextNode(node, store, visiterOption, visiterOption.generateAst ? node.solveAst(node.astResults) : null);
-      }
-    } else if (node instanceof MatchNode) {
-      visiterOption.onMatchNode(node, store, visiterOption);
+      visiterChildNode(node, store, visiterOption, childIndex);
     } else if (node instanceof TreeNode) {
-      const nextChild = node.childs[childIndex];
-      if (childIndex < node.childs.length - 1) {
-        store.restChances.push({
-          node,
-          tokenIndex: currentTokenIndex,
-          childIndex: childIndex + 1
-        });
-      }
-      if (nextChild) {
-        visiter(nextChild, store, visiterOption, 0);
+      visiterChildNode(node, store, visiterOption, childIndex);
+    } else if (node instanceof MatchNode) {
+      if (node.matching.type === 'loose') {
+        if (node.matching.value === true) {
+          visiterNextNodeFromParent(node, store, visiterOption, null);
+        } else {
+          throw Error('Not support loose false!');
+        }
+      } else {
+        console.log('solveNextMatchNodeFinders', node, store.nextMatchNodeFinders);
+
+        if (node.matching.value === ',') {
+          debugger;
+        }
+
+        solveNextMatchNodeFinders(node, store, visiterOption);
+        visiterOption.onMatchNode(node, store, visiterOption);
       }
     } else if (node instanceof FunctionNode) {
       const replacedNode = node.run();
@@ -484,25 +462,78 @@ const visiter = tailCallOptimize(
   }
 );
 
-const visiterNextNode = tailCallOptimize(
+function visiterChildNode(node: ParentNode, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) {
+  const nextMatchNode = node.nextMatchNodes[childIndex];
+
+  // if (!nextMatchNode) {
+  //   console.log(111, childIndex, nextMatchNode);
+  // } else {
+  //   console.log(111, node, childIndex, nextMatchNode);
+  // }
+
+  // If has nextMatchNode, jump to it directly.
+  if (nextMatchNode) {
+    if (typeof nextMatchNode.matchNode === 'boolean') {
+      if (nextMatchNode.matchNode === false) {
+        return noNextNode(node, store, visiterOption);
+      } else {
+        throw Error('Unexpect next match node "true"');
+      }
+    } else {
+      // Preset all chances.
+      nextMatchNode.nextChances.forEach(nextChance => {
+        addChances(nextChance.node, store, visiterOption, nextChance.tokenIndex, nextChance.childIndex);
+      });
+      // Call target matchNode directly.
+      return visiter(nextMatchNode.matchNode, store, visiterOption, 0);
+    }
+  } else {
+    // No nextMatchNode, add it to find queue.
+    console.log('add nextMatchNodeFinders', node, childIndex);
+    store.nextMatchNodeFinders.add({
+      node,
+      childIndex
+    });
+  }
+
+  if (node instanceof ChainNode) {
+    // console.log('visiter chain node', node, childIndex);
+    const child = node.childs[childIndex];
+    if (child) {
+      visiter(child, store, visiterOption, 0);
+    } else {
+      visiterNextNodeFromParent(
+        node,
+        store,
+        visiterOption,
+        visiterOption.generateAst ? node.solveAst(node.astResults) : null
+      );
+    }
+  } else {
+    const child = node.childs[childIndex];
+    if (childIndex + 1 < node.childs.length) {
+      addChances(node, store, visiterOption, store.scanner.getIndex(), childIndex + 1);
+    }
+    if (child) {
+      visiter(child, store, visiterOption, 0);
+    } else {
+      throw Error('tree node unexpect end');
+    }
+  }
+}
+
+const visiterNextNodeFromParent = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
+    console.log('visiterNextNodeFromParent');
     if (visiterOption.onVisiterNextNode) {
       visiterOption.onVisiterNextNode(node);
     }
 
     // TODO:
-    // console.log('visiterNextNode', node, store.restChances.length, store.scanner.getIndex());
+    // console.log('visiterNextNode', store.restChances.length, store.scanner.getIndex(), node);
 
     if (!node.parentNode) {
-      // Finish matching!
-      if (store.scanner.isEnd()) {
-        if (visiterOption.onSuccess) {
-          visiterOption.onSuccess();
-        }
-      } else {
-        tryChances(node, store, visiterOption);
-      }
-      return;
+      return noNextNode(node, store, visiterOption);
     }
 
     if (node.parentNode instanceof ChainNode) {
@@ -519,84 +550,125 @@ const visiterNextNode = tailCallOptimize(
       if (node.parentNode.isPlus && node.parentIndex + 1 === node.parentNode.childs.length) {
         // console.log('!!!!!!!!call parent plus, add chance', node.parentNode);
         node.parentNode.plusHeadIndex++;
-        store.restChances.push({
-          node: node.parentNode,
-          childIndex: 0,
-          tokenIndex: store.scanner.getIndex()
-        });
+        addChances(node.parentNode, store, visiterOption, store.scanner.getIndex(), 0);
       }
 
+      console.log('call parent node', node.parentNode, node.parentIndex + 1);
       visiter(node.parentNode, store, visiterOption, node.parentIndex + 1);
     } else if (node.parentNode instanceof TreeNode) {
-      visiterNextNode(node.parentNode, store, visiterOption, astValue);
+      visiterNextNodeFromParent(node.parentNode, store, visiterOption, astValue);
     } else {
       throw Error('Unexpected parent node type: ' + node.parentNode);
     }
   }
 );
 
-function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
-  store.version = store.parser.getNewVersion();
+function noNextNode(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
+  solveNextMatchNodeFinders(false, store, visiterOption);
+  if (store.scanner.isEnd()) {
+    if (visiterOption.onSuccess) {
+      visiterOption.onSuccess();
+    }
+  } else {
+    tryChances(node, store, visiterOption);
+  }
+}
 
+function addChances(
+  node: ParentNode,
+  store: VisiterStore,
+  visiterOption: VisiterOption,
+  tokenIndex: number,
+  childIndex: number
+) {
+  const chance = {
+    node,
+    tokenIndex,
+    childIndex
+  };
+  addChanceToNextMatchNodeFinders(chance, store, visiterOption);
+  store.restChances.push(chance);
+}
+
+function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
   if (store.restChances.length === 0) {
+    solveNextMatchNodeFinders(false, store, visiterOption);
     if (visiterOption.onFail) {
       visiterOption.onFail(node);
     }
     return;
   }
 
-  // console.log('try chance, chance before', store.restTreeChances.length);
-
   const recentChance = store.restChances.pop();
-
-  // console.log('chance after', store.restTreeChances.length);
 
   // reset scanner index
   store.scanner.setIndex(recentChance.tokenIndex);
 
-  // reset node childIndex
-  recentChance.node.childIndex = recentChance.childIndex;
-
-  // reset parent node's index
-  recentChance.node.version = store.version;
-
   visiter(recentChance.node, store, visiterOption, recentChance.childIndex);
 }
 
+function solveNextMatchNodeFinders(matchNode: MatchNode | boolean, store: VisiterStore, visiterOption: VisiterOption) {
+  if (!visiterOption.generateNextMatchNodes) {
+    return;
+  }
+
+  store.nextMatchNodeFinders.forEach(nextMatchNodeFinder => {
+    if (!nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex]) {
+      nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex] = {
+        matchNode,
+        nextChances: []
+      };
+    } else {
+      nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex].matchNode = matchNode;
+    }
+  });
+  store.nextMatchNodeFinders.clear();
+}
+
+function addChanceToNextMatchNodeFinders(chance: IChance, store: VisiterStore, visiterOption: VisiterOption) {
+  if (!visiterOption.generateNextMatchNodes) {
+    return;
+  }
+
+  store.nextMatchNodeFinders.forEach(nextMatchNodeFinder => {
+    if (!nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex]) {
+      nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex] = {
+        matchNode: null,
+        nextChances: [chance]
+      };
+    } else {
+      nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex].nextChances.push(chance);
+    }
+  });
+}
 
 // find all tokens that may appear next
 function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
-  // Skip parent tree node, because chain -> tree -> match(findNextMatchNodes) equals to chain -> tree(findNextMatchNodes)
-  if (node.parentNode instanceof TreeNode) {
-    return findNextMatchNodes(node.parentNode, parser);
-  }
+  return [];
+  // const nextMatchNodes: MatchNode[] = [];
 
-  const newVersion = parser.getNewVersion();
+  // let passCurrentNode = false;
 
-  const nextMatchNodes: MatchNode[] = [];
+  // const visiterOption: VisiterOption = {
+  //   generateAst: false,
+  //   enableFirstSet: false,
+  //   generateNextMatchNodes: false,
+  //   onMatchNode: (matchNode, store, currentVisiterOption) => {
+  //     if (matchNode === node && passCurrentNode === false) {
+  //       passCurrentNode = true;
+  //       visiterNextNodeFromParent(matchNode, store, currentVisiterOption, null);
+  //     }
 
-  const visiterOption: VisiterOption = {
-    generateAst: false,
-    enableFirstSet: false,
-    onMatchNode: (matchNode, store, currentVisiterOption) => {
-      if (matchNode.matching.type === 'loose' && matchNode.matching.value === true) {
-        visiterNextNode(matchNode, store, currentVisiterOption, null);
-      } else {
-        nextMatchNodes.push(matchNode);
+  //     nextMatchNodes.push(matchNode);
 
-        // Suppose the match failed, so we can find another possible match chance!
-        tryChances(matchNode, store, currentVisiterOption);
-      }
-    }
-  };
+  //     // Suppose the match failed, so we can find another possible match chance!
+  //     tryChances(matchNode, store, currentVisiterOption);
+  //   }
+  // };
 
-  if (node.parentNode) {
-    newVisiter(node.parentNode, newVersion, new Scanner([]), visiterOption, parser);
-  } else {
-    newVisiter(node, newVersion, new Scanner([]), visiterOption, parser);
-  }
+  // newVisiter(node, new Scanner([]), visiterOption, parser);
 
-  return nextMatchNodes;
+  // return nextMatchNodes;
 }
 
 function generateFirstSet(node: ChainNode, parser: Parser) {

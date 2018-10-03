@@ -3,72 +3,74 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { chain, createLexer, createParser, many, matchTokenType, optional, sqlParser } from '../src';
 
-const myLexer = createLexer([
-  {
-    type: 'whitespace',
-    regexes: [/^(\s+)/],
-    ignore: true
-  },
-  {
-    type: 'word',
-    regexes: [/^([a-zA-Z0-9]+)/] // 解析数字
-  },
-  {
-    type: 'operator',
-    regexes: [
-      /^(\(|\))/, // 解析 ( )
-      /^(\+|\-|\*|\/)/ // 解析 + - * /
-    ]
-  }
-]);
+// const myLexer = createLexer([
+//   {
+//     type: 'whitespace',
+//     regexes: [/^(\s+)/],
+//     ignore: true
+//   },
+//   {
+//     type: 'word',
+//     regexes: [/^([a-zA-Z0-9]+)/] // 解析数字
+//   },
+//   {
+//     type: 'operator',
+//     regexes: [
+//       /^(\(|\))/, // 解析 ( )
+//       /^(\+|\-|\*|\/)/ // 解析 + - * /
+//     ]
+//   }
+// ]);
 
-// const root = () => chain(term, optional(addOp, root))(parseTermAst);
+// // const root = () => chain(term, optional(addOp, root))(parseTermAst);
 
-// const term = () => chain(factor, optional(mulOp, root))(parseTermAst);
+// // const term = () => chain(factor, optional(mulOp, root))(parseTermAst);
 
-// const mulOp = () => chain(['*', '/'])(ast => ast[0].value);
+// // const mulOp = () => chain(['*', '/'])(ast => ast[0].value);
 
-// const addOp = () => chain(['+', '-'])(ast => ast[0].value);
+// // const addOp = () => chain(['+', '-'])(ast => ast[0].value);
 
-// const factor = () =>
-//   chain([chain('(', root, ')')(ast => ast[1]), chain(matchTokenType('word'))(ast => ast[0].value)])(ast => ast[0]);
+// // const factor = () =>
+// //   chain([chain('(', root, ')')(ast => ast[1]), chain(matchTokenType('word'))(ast => ast[0].value)])(ast => ast[0]);
 
-const root = () => chain(matchTokenType('word'), optional('+', root))();
+// const root = () => chain(matchTokenType('word'), optional('+', root))();
 
-const myParser = createParser(
-  root, // Root grammar.
-  myLexer // Created in lexer example.
-);
+// const myParser = createParser(
+//   root, // Root grammar.
+//   myLexer // Created in lexer example.
+// );
 
-const parseTermAst = (ast: any) =>
-  ast[1]
-    ? ast[1].reduce(
-        (obj: any, next: any) =>
-          next[0]
-            ? {
-                operator: next[0],
-                left: obj || ast[0],
-                right: next[1]
-              }
-            : {
-                operator: next[1] && next[1].operator,
-                left: obj || ast[0],
-                right: next[1] && next[1].right
-              },
-        null
-      )
-    : ast[0];
+// const parseTermAst = (ast: any) =>
+//   ast[1]
+//     ? ast[1].reduce(
+//         (obj: any, next: any) =>
+//           next[0]
+//             ? {
+//                 operator: next[0],
+//                 left: obj || ast[0],
+//                 right: next[1]
+//               }
+//             : {
+//                 operator: next[1] && next[1].operator,
+//                 left: obj || ast[0],
+//                 right: next[1] && next[1].right
+//               },
+//         null
+//       )
+//     : ast[0];
 
-const res = myParser('1+1+1+1+1+');
-// tslint:disable-next-line:no-console
-console.log('res', res);
+// const res = myParser('1+1+1+1+1+');
+// // tslint:disable-next-line:no-console
+// console.log('res', res);
+
+console.log(sqlParser('select a from b;'));
 
 class Props {}
 
 class State {}
 
 const mockAsyncParser = async (text: string, index: number) => {
-  return Promise.resolve().then(() => myParser(text, index));
+  return Promise.resolve().then(() => sqlParser(text, index));
 };
 
 export default class Page extends React.PureComponent<Props, State> {
