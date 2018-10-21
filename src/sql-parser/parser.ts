@@ -78,6 +78,7 @@ const tableSourceItem = () =>
 const joinPart = () =>
   chain(
     [
+      'join',
       'straight_join',
       chain(['inner', 'cross'], 'join')(),
       chain(['left', 'right'], optional('outer'), 'join')(),
@@ -255,9 +256,11 @@ const isOrNotExpression = () =>
   ])();
 
 const fieldItem = () =>
-  chain([functionChain, chain(stringOrWordOrNumber, [optional('.', '*'), plus('.', stringOrWordOrNumber)])(), '*'])(
-    ast => ast[0]
-  );
+  chain([
+    functionChain,
+    chain(stringOrWordOrNumber, [optional('.', '*'), optional(':', normalFunction), plus('.', stringOrWordOrNumber)])(),
+    '*'
+  ])(ast => ast[0]);
 
 const field = () => createFourOperations(fieldItem)();
 
