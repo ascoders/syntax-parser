@@ -57,7 +57,8 @@ const whereStatement = () => chain('where', expression)(ast => ast[1]);
 const selectField = () =>
   chain([
     chain(
-      [chain(many('not'), [field, chain('(', field, ')')()])(), chain(field, optional(overClause))(), caseStatement],
+      many('not'),
+      [chain(field, optional(overClause))(), chain('(', field, ')')(), caseStatement],
       optional(alias)
     )(),
     '*'
@@ -67,29 +68,24 @@ const selectField = () =>
 //       ::= field (, fieldList)?
 const fieldList = () => chain(field, many(',', field))();
 
-const tableSources = () => chain(tableSource, many(',', tableSource))();
+const tableSources = () => chain(tableSource, optional(',', tableSources))();
 
-// prettier-ignore
-const tableSource = () =>
-  chain([
-    chain(tableSourceItem, many(joinPart))(),
-    chain('(', tableSourceItem, many(joinPart), ')')(),
-  ])();
+const tableSource = () => chain(tableSourceItem, many(joinPart))();
 
 const tableSourceItem = () =>
-  chain([
-    chain(tableName, optional(alias))(),
-    chain([selectStatement, chain('(', selectStatement, ')')()], alias)(),
-    chain('(', tableSources, ')')()
-  ])();
+  chain([chain(tableName, optional(alias))(), chain([selectStatement, chain('(', selectStatement, ')')()], alias)()])();
 
 const joinPart = () =>
-  chain([
-    chain(['inner', 'cross'], 'join', tableSourceItem, optional('on', expression))(),
-    chain('straight_join', tableSourceItem, optional('on', expression))(),
-    chain(['left', 'right'], optional('outer'), 'join', tableSourceItem, optional('on', expression))(),
-    chain('natural', optional(['left', 'right'], optional('outer')), 'join', tableSourceItem)()
-  ])();
+  chain(
+    [
+      'straight_join',
+      chain(['inner', 'cross'], 'join')(),
+      chain(['left', 'right'], optional('outer'), 'join')(),
+      chain('natural', optional(['left', 'right'], optional('outer')), 'join')()
+    ],
+    tableSourceItem,
+    optional('on', expression)
+  )();
 
 // Alias ::= AS WordOrString
 //         | WordOrString
@@ -158,16 +154,15 @@ const limitClause = () =>
 // ----------------------------------- Function -----------------------------------
 const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
 
-const functionFields = () => chain(functionFieldItem, many(',', functionFieldItem))();
-
-const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])();
-
 const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
 
-//  matchTokenType('word') ....
 const castFunction = () => chain('cast', '(', fieldItem, 'as', dataType, ')')();
 
 const normalFunction = () => chain(matchTokenType('word'), '(', optional(functionFields), ')')();
+
+const functionFields = () => chain(functionFieldItem, many(',', functionFieldItem))();
+
+const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])();
 
 // ----------------------------------- Case -----------------------------------
 const caseStatement = () =>
@@ -182,11 +177,11 @@ const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
 // ----------------------------------- set statement -----------------------------------
 
-const setStatement = () => chain('set', [variableAssignments])();
+const setStatement = () => chain('set', variableAssignments)();
 
 const variableAssignments = () => chain(variableAssignment, many(',', variableAssignment))();
 
-const variableAssignment = () => chain(fieldItem, '=', [fieldItem, 'true'])();
+const variableAssignment = () => chain(fieldItem, '=', fieldItem)();
 
 // ----------------------------------- Utils -----------------------------------
 
@@ -218,7 +213,7 @@ const dataType = () =>
  * | boolean_primary 
 **/
 
-const expression = () => chain(expressionHead, many(logicalOperator, expression))();
+const expression = () => chain(expressionHead, optional(logicalOperator, expression))();
 
 const expressionHead = () =>
   chain([
@@ -227,24 +222,16 @@ const expressionHead = () =>
     chain(booleanPrimary, optional(chain('is', optional('not'), ['true', 'false', 'unknown'])()))
   ])();
 
-/*
- *boolean_primary:
- *   boolean_primary IS [NOT] NULL
- * | boolean_primary <=> predicate
- * | boolean_primary comparison_operator predicate
- * | boolean_primary comparison_operator {ALL | ANY} (subquery)
- * | predicate
-**/
+// /*
+//  *boolean_primary:
+//  *   boolean_primary IS [NOT] NULL
+//  * | boolean_primary <=> predicate
+//  * | boolean_primary comparison_operator predicate
+//  * | boolean_primary comparison_operator {ALL | ANY} (subquery)
+//  * | predicate
+// **/
 const booleanPrimary = () =>
-  chain(
-    predicate,
-    many([
-      'isnull',
-      chain(optional('is'), optional('not'), ['null', field])(),
-      chain(comparisonOperator, predicate)()
-      // chain(comparisonOperator, ['ALL',  'ANY'], (subquery))
-    ])
-  )();
+  chain(predicate, many(['isnull', chain(optional('is'), optional('not'), ['null', field])()]))();
 
 /*
  * predicate:
@@ -257,10 +244,7 @@ const booleanPrimary = () =>
  *  | field
 **/
 const predicate = () =>
-  chain(
-    field,
-    optional([chain(comparisonOperator, [field, 'null'])(), chain('sounds', 'like', field)(), isOrNotExpression])
-  )();
+  chain(field, optional([chain(comparisonOperator, field)(), chain('sounds', 'like', field)(), isOrNotExpression]))();
 
 const isOrNotExpression = () =>
   chain(optional('is'), optional('not'), [

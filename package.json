@@ -1,6 +1,6 @@
 {
   "name": "syntax-parser",
-  "version": "0.1.2",
+  "version": "1.0.0-beta1",
   "pri": {
     "type": "component"
   },
@@ -18,7 +18,7 @@
     "posttest": "codecov -f coverage/*.json -t dc6610f3-32ac-4d30-8676-74d3888349a0"
   },
   "devDependencies": {
-    "pri": "1.0.0-beta12"
+    "pri": "1.0.0-beta37"
   },
   "main": "dist/src/index.js",
   "types": "src/index.tsx",
@@ -27,13 +27,6 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
-    "@babel/plugin-transform-typescript": "^7.0.0",
-    "@babel/preset-typescript": "^7.0.0",
-    "@babel/register": "^7.0.0",
-    "@babel/runtime": "^7.0.0",
-    "@types/jest": "^23.3.1",
-    "jest": "^23.5.0",
-    "ts-jest": "^23.1.4",
-    "ts-node": "^7.0.1"
+    "@babel/runtime": "^7.0.0"
   }
 }

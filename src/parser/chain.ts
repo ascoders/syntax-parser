@@ -201,9 +201,9 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
 
     chainNode.childs = elements.map((element, index) => createNodeByElement(element, chainNode, index, parser));
 
-    // if (functionName) {
-    //   generateFirstSet(chainNode, parser);
-    // }
+    if (functionName) {
+      generateFirstSet(chainNode, parser);
+    }
 
     return chainNode;
   };
@@ -290,8 +290,12 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
         const matchResult = matchNode.run(store.scanner);
 
         if (!matchResult.match) {
+          // TODO:
+          // console.log('not match', matchNode.matching, matchResult.token && matchResult.token.value);
           tryChances(matchNode, store, currentVisiterOption);
         } else {
+          // TODO:
+          // console.log('match', matchNode.matching, matchResult.token && matchResult.token.value);
           const restTokenCount = store.scanner.getRestTokenCount();
           // Last match at least token remaining, is the most readable reason for error.
           if (
@@ -413,6 +417,10 @@ const visiter = tailCallOptimize(
     }
 
     if (node instanceof ChainNode) {
+      if (firstSetUnMatch(node, store, visiterOption, childIndex)) {
+        return; // If unmatch, stop!
+      }
+
       visitChildNode(node, store, visiterOption, childIndex);
     } else if (node instanceof TreeNode) {
       visitChildNode(node, store, visiterOption, childIndex);
@@ -681,3 +689,112 @@ function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
 
   return nextMatchNodes;
 }
+
+// First Set -----------------------------------------------------------------
+
+function firstSetUnMatch(node: ChainNode, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) {
+  if (
+    visiterOption.enableFirstSet &&
+    node.functionName &&
+    childIndex === 0 &&
+    store.parser.firstSet.has(node.functionName)
+  ) {
+    const firstMatchNodes = store.parser.firstSet.get(node.functionName);
+
+    // If not match any first match node, try chances
+    if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
+      // Clear caches, because we stop visit!
+      store.nextMatchNodeFinders.forEach(nextMatchNodeFinder => {
+        nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex] = {
+          matchNode: null,
+          nextChances: [],
+          ready: false
+        };
+      });
+      store.nextMatchNodeFinders.clear();
+
+      tryChances(node, store, visiterOption);
+      return true; // Yes, unMatch.
+    } else {
+      return false; // No, Match.
+    }
+  }
+}
+
+function generateFirstSet(node: ChainNode, parser: Parser) {
+  const functionName = node.functionName;
+
+  if (parser.firstSet.has(functionName)) {
+    return;
+  }
+
+  const firstMatchNodes = getFirstOrFunctionSet(node, functionName, parser);
+  parser.firstOrFunctionSet.set(functionName, firstMatchNodes);
+
+  solveFirstSet(functionName, parser);
+}
+
+function getFirstOrFunctionSet(node: Node, functionName: string, parser: Parser): FirstOrFunctionSet[] {
+  if (node instanceof ChainNode) {
+    if (node.childs[0]) {
+      return getFirstOrFunctionSet(node.childs[0], functionName, parser);
+    }
+  } else if (node instanceof TreeNode) {
+    return node.childs.reduce((all, next) => all.concat(getFirstOrFunctionSet(next, functionName, parser)), []);
+  } else if (node instanceof MatchNode) {
+    return [node];
+  } else if (node instanceof FunctionNode) {
+    const relatedFunctionName = node.getFunctionName();
+
+    if (parser.relatedSet.has(relatedFunctionName)) {
+      parser.relatedSet.get(relatedFunctionName).add(functionName);
+    } else {
+      parser.relatedSet.set(relatedFunctionName, new Set([functionName]));
+    }
+
+    return [relatedFunctionName];
+  } else {
+    throw Error('Unexpected node: ' + node);
+  }
+}
+
+function solveFirstSet(functionName: string, parser: Parser) {
+  if (parser.firstSet.has(functionName)) {
+    return;
+  }
+
+  const firstMatchNodes = parser.firstOrFunctionSet.get(functionName);
+
+  // Try if relate functionName has done first set.
+  const newFirstMatchNodes = firstMatchNodes.reduce(
+    (all, firstMatchNode) => {
+      if (typeof firstMatchNode === 'string') {
+        if (parser.firstSet.has(firstMatchNode)) {
+          all = all.concat(parser.firstSet.get(firstMatchNode));
+        } else {
+          all.push(firstMatchNode);
+        }
+      } else {
+        all.push(firstMatchNode);
+      }
+
+      return all;
+    },
+    [] as FirstOrFunctionSet[]
+  );
+
+  parser.firstOrFunctionSet.set(functionName, newFirstMatchNodes);
+
+  // If all set hasn't function node, we can solve it's relative set.
+  if (newFirstMatchNodes.every(firstMatchNode => firstMatchNode instanceof MatchNode)) {
+    parser.firstSet.set(functionName, newFirstMatchNodes as MatchNode[]);
+
+    // If this functionName has related functionNames, solve them
+    if (parser.relatedSet.has(functionName)) {
+      const relatedFunctionNames = parser.relatedSet.get(functionName);
+      relatedFunctionNames.forEach(relatedFunctionName => solveFirstSet);
+    }
+  }
+}
+
+// First set /////////////////////////////////////////////////////////////////

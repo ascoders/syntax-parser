@@ -3,7 +3,7 @@ import { chain } from './chain';
 import { Scanner } from './scanner';
 
 export interface IMatch {
-  token: IToken;
+  token?: IToken;
   match: boolean;
 }
 
