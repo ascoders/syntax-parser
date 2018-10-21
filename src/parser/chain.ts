@@ -33,11 +33,11 @@ export interface IMatching {
   value: string | boolean;
 }
 
-const MAX_VISITER_CALL = 10000000;
+const MAX_VISITER_CALL = 1000000;
 
 class VisiterOption {
-  public onCallVisiter?: (node?: Node) => void;
-  public onVisiterNextNode?: (node?: Node) => void;
+  public onCallVisiter?: (node?: Node, store?: VisiterStore) => void;
+  public onVisiterNextNode?: (node?: Node, store?: VisiterStore) => void;
   public onSuccess?: () => void;
   public onFail?: (lastNode?: Node) => void;
   public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
@@ -224,6 +224,7 @@ class VisiterStore {
     node: ParentNode;
     childIndex: number;
   }>();
+  public stop = false;
 
   constructor(public scanner: Scanner, public parser: Parser) {}
 }
@@ -267,17 +268,17 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     parser.rootChainNode,
     scanner,
     {
-      onCallVisiter: node => {
+      onCallVisiter: (node, store) => {
         callVisiterCount++;
 
         if (callVisiterCount > MAX_VISITER_CALL) {
-          throw Error('call visiter more then ' + MAX_VISITER_CALL);
+          store.stop = true;
         }
       },
-      onVisiterNextNode: node => {
+      onVisiterNextNode: (node, store) => {
         callParentCount++;
         if (callParentCount > MAX_VISITER_CALL) {
-          throw Error('call parent more then' + MAX_VISITER_CALL);
+          store.stop = true;
         }
       },
       onSuccess: () => {
@@ -408,12 +409,17 @@ function newVisiter(node: Node, scanner: Scanner, visiterOption: VisiterOption, 
 
 const visiter = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) => {
+    if (store.stop) {
+      fail(node, store, visiterOption);
+      return;
+    }
+
     if (!node) {
       throw Error('no node!');
     }
 
     if (visiterOption.onCallVisiter) {
-      visiterOption.onCallVisiter(node);
+      visiterOption.onCallVisiter(node, store);
     }
 
     if (node instanceof ChainNode) {
@@ -426,6 +432,7 @@ const visiter = tailCallOptimize(
       visitChildNode(node, store, visiterOption, childIndex);
     } else if (node instanceof MatchNode) {
       if (node.matching.type === 'loose') {
+        // console.log('loose');
         if (node.matching.value === true) {
           visitNextNodeFromParent(node, store, visiterOption, null);
         } else {
@@ -515,8 +522,13 @@ function visitChildNode(node: ParentNode, store: VisiterStore, visiterOption: Vi
 
 const visitNextNodeFromParent = tailCallOptimize(
   (node: Node, store: VisiterStore, visiterOption: VisiterOption, astValue: any) => {
+    if (store.stop) {
+      fail(node, store, visiterOption);
+      return;
+    }
+
     if (visiterOption.onVisiterNextNode) {
-      visiterOption.onVisiterNextNode(node);
+      visiterOption.onVisiterNextNode(node, store);
     }
 
     if (!node.parentNode) {
@@ -597,9 +609,7 @@ function addChances({
 function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
   if (store.restChances.length === 0) {
     solveNextMatchNodeFinders({ matchNode: false, store, visiterOption });
-    if (visiterOption.onFail) {
-      visiterOption.onFail(node);
-    }
+    fail(node, store, visiterOption);
     return;
   }
 
@@ -609,6 +619,14 @@ function tryChances(node: Node, store: VisiterStore, visiterOption: VisiterOptio
   store.scanner.setIndex(recentChance.tokenIndex);
 
   visiter(recentChance.node, store, visiterOption, recentChance.childIndex);
+}
+
+function fail(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
+  cleanNextMatchNodeFinders(store);
+
+  if (visiterOption.onFail) {
+    visiterOption.onFail(node);
+  }
 }
 
 function solveNextMatchNodeFinders({
@@ -690,6 +708,18 @@ function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
   return nextMatchNodes;
 }
 
+function cleanNextMatchNodeFinders(store: VisiterStore) {
+  // Clear caches, because we stop visit!
+  store.nextMatchNodeFinders.forEach(nextMatchNodeFinder => {
+    nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex] = {
+      matchNode: null,
+      nextChances: [],
+      ready: false
+    };
+  });
+  store.nextMatchNodeFinders.clear();
+}
+
 // First Set -----------------------------------------------------------------
 
 function firstSetUnMatch(node: ChainNode, store: VisiterStore, visiterOption: VisiterOption, childIndex: number) {
@@ -704,14 +734,7 @@ function firstSetUnMatch(node: ChainNode, store: VisiterStore, visiterOption: Vi
     // If not match any first match node, try chances
     if (!firstMatchNodes.some(firstMatchNode => firstMatchNode.run(store.scanner, false).match)) {
       // Clear caches, because we stop visit!
-      store.nextMatchNodeFinders.forEach(nextMatchNodeFinder => {
-        nextMatchNodeFinder.node.nextMatchNodes[nextMatchNodeFinder.childIndex] = {
-          matchNode: null,
-          nextChances: [],
-          ready: false
-        };
-      });
-      store.nextMatchNodeFinders.clear();
+      cleanNextMatchNodeFinders(store);
 
       tryChances(node, store, visiterOption);
       return true; // Yes, unMatch.

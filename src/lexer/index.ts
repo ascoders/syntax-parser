@@ -23,10 +23,14 @@ class Tokenizer {
       const result = this.getNextToken(input);
 
       if (!result || !result.token) {
-        throw Error(`Lexer: Unexpected string "${input}"`);
+        throw Error(`Lexer: Unexpected string "${input}".`);
       }
 
       token = result.token;
+
+      if (!token.value) {
+        throw Error(`Lexer: Regex parse error, please check your lexer config.`);
+      }
 
       token.position = [lastPosition, lastPosition + token.value.length - 1];
       lastPosition += token.value.length;
