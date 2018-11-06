@@ -1,5 +1,6 @@
+import * as _ from 'lodash';
 import { IToken } from '../lexer/token';
-import { chain } from './chain';
+import { chain, IElements, ISolveAst } from './chain';
 import { Scanner } from './scanner';
 
 export interface IMatch {
@@ -7,11 +8,19 @@ export interface IMatch {
   match: boolean;
 }
 
-function equalWordOrIncludeWords(str: string, word: string | string[]) {
+function equalWordOrIncludeWords(str: string, word: string | string[] | null) {
   if (typeof word === 'string') {
-    return str.toLowerCase() === word.toLowerCase();
+    return judgeMatch(str, word);
   } else {
-    return word.some(eachWord => eachWord.toLowerCase() === str.toLowerCase());
+    return word.some(eachWord => judgeMatch(str, eachWord));
+  }
+}
+
+function judgeMatch(source: string, target: string) {
+  if (source === null) {
+    return false;
+  } else {
+    return source.toLowerCase() === target.toLowerCase();
   }
 }
 
@@ -45,7 +54,9 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) =
     function foo() {
       return (scanner: Scanner, isCostToken?: boolean) => fn(scanner, arg, isCostToken);
     }
+
     foo.prototype.name = 'match';
+
     foo.prototype.displayName = specialName;
     return foo;
   };
@@ -55,10 +66,52 @@ export const match = createMatch((scanner, word: string | string[], isCostToken)
   matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
 );
 
-export const matchTokenType = (tokenType: string) =>
-  createMatch((scanner, word, isCostToken) => {
-    return matchToken(scanner, token => token.type === tokenType, isCostToken);
+interface IMatchTokenTypeOption {
+  includes?: string[];
+  excludes?: string[];
+}
+
+export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = {}) => {
+  const options: IMatchTokenTypeOption = { includes: [], excludes: [], ...opts };
+
+  return createMatch((scanner, word, isCostToken) => {
+    return matchToken(
+      scanner,
+      token => {
+        if (options.includes.some(includeValue => includeValue === token.value)) {
+          return true;
+        }
+
+        if (options.excludes.some(includeValue => includeValue === token.value)) {
+          return false;
+        }
+
+        if (token.type !== tokenType) {
+          return false;
+        }
+
+        return true;
+      },
+      isCostToken
+    );
   }, tokenType)();
+};
+
+export const matchSystemType = (systemType: string) => {
+  return createMatch((scanner, word, isCostToken) => {
+    return matchToken(
+      scanner,
+      token => {
+        if (token.systemType !== systemType) {
+          return false;
+        }
+
+        return true;
+      },
+      isCostToken
+    );
+  })();
+};
 
 export const matchTrue = (): IMatch => ({
   token: null,
@@ -70,20 +123,33 @@ export const matchFalse = (): IMatch => ({
   match: true
 });
 
-export function optional(...elements: any[]) {
-  return chain([chain(...elements)(), true])(ast => ast[0]);
-}
+export const optional = (...elements: IElements) => {
+  if (elements.length === 0) {
+    throw Error('Must have arguments!');
+  }
 
-export function plus(...elements: any[]) {
-  const result = chain(...elements)();
-  (result as any).prototype.isPlus = true;
-  return result;
-}
+  return chain([chain(...elements)(ast => (elements.length === 1 ? ast[0] : ast)), true])(ast => ast[0]);
+};
 
-export function optionalOneElement(element: any) {
-  return chain([chain(element)(ast => ast[0]), true])(ast => ast[0]);
-}
+export const plus = (...elements: IElements) => {
+  if (elements.length === 0) {
+    throw Error('Must have arguments!');
+  }
 
-export function many(...elements: any[]) {
-  return optionalOneElement(plus(...elements));
-}
+  const plusFunction = () =>
+    chain(chain(...elements)(ast => (elements.length === 1 ? ast[0] : ast)), optional(plusFunction))(ast => {
+      if (ast[1]) {
+        return [ast[0]].concat(ast[1]);
+      } else {
+        return [ast[0]];
+      }
+    });
+  return plusFunction;
+};
+
+export const many = (...elements: IElements) => {
+  if (elements.length === 0) {
+    throw Error('Must have arguments!');
+  }
+  return optional(plus(...elements));
+};

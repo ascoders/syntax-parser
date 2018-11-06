@@ -23,13 +23,17 @@ export class Scanner {
     this.index++;
   };
 
+  public isEnd = () => {
+    return this.index >= this.tokens.length;
+  };
+
   public getIndex = () => this.index;
 
   public setIndex = (index: number) => (this.index = index);
 
   public getRestTokenCount = () => this.tokens.length - this.index - 1;
 
-  public getNextFromToken = (token: IToken) => {
+  public getNextByToken = (token: IToken) => {
     const currentTokenIndex = this.tokens.findIndex(eachToken => eachToken === token);
     if (currentTokenIndex > -1) {
       if (currentTokenIndex + 1 < this.tokens.length) {
@@ -38,24 +42,36 @@ export class Scanner {
         return null;
       }
     } else {
-      throw Error(`token ${token.value} not exist in scanner.`);
+      throw Error(`token ${token.value.toString()} not exist in scanner.`);
     }
   };
 
-  public isEnd = () => {
-    return this.index >= this.tokens.length;
+  public getTokenByCharacterIndex = (characterIndex: number) => {
+    if (characterIndex === null) {
+      return null;
+    }
+
+    for (const token of this.tokens) {
+      if (characterIndex >= token.position[0] && characterIndex - 1 <= token.position[1]) {
+        return token;
+      }
+    }
+
+    return null;
   };
 
-  public getPrevTokenFromCharacterIndex = (characterIndex: number) => {
+  public getPrevTokenByCharacterIndex = (characterIndex: number) => {
     let prevToken: IToken = null;
+    let prevTokenIndex: number = null;
 
-    this.tokens.forEach(token => {
-      if (token.position[1] < characterIndex) {
+    this.tokens.forEach((token, index) => {
+      if (token.position[1] < characterIndex - 1) {
         prevToken = token;
+        prevTokenIndex = index;
       }
     });
 
-    return prevToken;
+    return { prevToken, prevTokenIndex };
   };
 
   public getNextTokenFromCharacterIndex = (characterIndex: number) => {
@@ -66,5 +82,16 @@ export class Scanner {
     }
 
     return null;
+  };
+
+  public addToken = (token: IToken) => {
+    const { prevToken, prevTokenIndex } = this.getPrevTokenByCharacterIndex(token.position[0]);
+
+    if (prevToken) {
+      // prevTokenIndex
+      this.tokens.splice(prevTokenIndex + 1, 0, token);
+    } else {
+      this.tokens.unshift(token);
+    }
   };
 }

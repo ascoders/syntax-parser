@@ -65,7 +65,7 @@ class Tokenizer {
     const matches = input.match(regex);
 
     if (matches) {
-      return { type, value: matches[1] };
+      return { type, value: matches[1], systemType: null } as IToken;
     }
   }
 }

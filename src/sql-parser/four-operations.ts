@@ -2,13 +2,13 @@ import { chain, ChainFunction, optional } from '../parser';
 
 // Four operations ---------------------------------
 export function createFourOperations(field: ChainFunction) {
-  const addExpr = () => chain(term, exprTail)();
+  const addExpr = () => chain(term, exprTail)(ast => ast[0]);
 
-  const exprTail = () => chain(optional(chain(addOp, term, exprTail)()))();
+  const exprTail = () => chain(optional(addOp, term, exprTail))();
 
-  const term = () => chain(factor, termTail)();
+  const term = () => chain(factor, termTail)(ast => ast[0]);
 
-  const termTail = () => chain(optional(chain(mulOp, factor, termTail)()))();
+  const termTail = () => chain(optional(mulOp, factor, termTail))();
 
   const mulOp = () => chain(['*', '/', '%'])(ast => ast[0]);
 

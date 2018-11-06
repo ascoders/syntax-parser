@@ -1,10 +1,11 @@
-import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
+import { chain, createParser, many, matchSystemType, matchTokenType, optional, plus } from '../parser';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './lexer';
+import { flattenAll } from './utils';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
-const statements = () => chain(statement, optional(';', statements))();
+const statements = () => chain(statement, many(';', statement))(ast => ast[0]);
 
 const statement = () =>
   chain([
@@ -40,12 +41,15 @@ const selectStatement = () =>
 const union = () => chain('union', ['all', 'distinct'])();
 
 const fromClause = () =>
-  chain('from', tableSources, optional(whereStatement), optional(groupByStatement), optional(havingStatement))();
+  chain('from', tableSources, optional(whereStatement), optional(groupByStatement), optional(havingStatement))(
+    ast =>
+      // TODO: Ignore where group having
+      ast[1]
+  );
 
-const selectList = () =>
-  chain(selectField, many(',', selectField))(ast => {
-    return ast;
-  });
+const selectList = () => chain(selectField, many(selectListTail))(flattenAll);
+
+const selectListTail = () => chain(',', selectField)(ast => ast[1]);
 
 const whereStatement = () => chain('where', expression)(ast => ast[1]);
 
@@ -58,22 +62,51 @@ const selectField = () =>
   chain([
     chain(
       many('not'),
-      [chain(field, optional(overClause))(), chain('(', field, ')')(), caseStatement],
+      [
+        chain(field, optional(overClause))(
+          ast =>
+            // TODO: Ignore overClause
+            ast[0]
+        ),
+        chain('(', field, ')')(),
+        caseStatement
+      ],
       optional(alias)
-    )(),
+    )(
+      ast =>
+        // TODO: Ignore not and alias
+        ast[1]
+    ),
     '*'
-  ])();
+  ])(ast => ast[0]);
 
 // fieldList
 //       ::= field (, fieldList)?
 const fieldList = () => chain(field, many(',', field))();
 
-const tableSources = () => chain(tableSource, optional(',', tableSources))();
+const tableSources = () => chain(tableSource, many(tableSourcesTail))(flattenAll);
 
-const tableSource = () => chain(tableSourceItem, many(joinPart))();
+const tableSourcesTail = () => chain(',', tableSource)(ast => ast[1]);
+
+const tableSource = () =>
+  chain(tableSourceItem, many(joinPart))(
+    ast =>
+      // TODO: Ignore join
+      ast[0]
+  );
 
 const tableSourceItem = () =>
-  chain([chain(tableName, optional(alias))(), chain([selectStatement, chain('(', selectStatement, ')')()], alias)()])();
+  chain([
+    chain(tableName, optional(alias))(
+      ast =>
+        // TODO: Ignore alias
+        ast[0]
+    ),
+    chain([selectStatement, chain('(', selectStatement, ')')(ast => ast[1])], alias)(ast => ({
+      ...ast[0],
+      alias: ast[1]
+    }))
+  ])(ast => ast[0]);
 
 const joinPart = () =>
   chain(
@@ -99,13 +132,13 @@ const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
 const tableOption = () => chain(stringOrWord, dataType)();
 
-const tableName = () => chain([matchTokenType('word'), chain(matchTokenType('word'), '.', matchTokenType('word'))()])();
+const tableName = () => chain([wordSym, chain(wordSym, '.', wordSym)()])(ast => ast[0]);
 
 // ----------------------------------- Having --------------------------------------------------
 const havingStatement = () => chain('having', expression)();
 
 // ----------------------------------- Create view statement -----------------------------------
-const createViewStatement = () => chain('create', 'view', matchTokenType('word'), 'as', selectStatement)();
+const createViewStatement = () => chain('create', 'view', wordSym, 'as', selectStatement)();
 
 // ----------------------------------- Insert statement -----------------------------------
 const insertStatement = () =>
@@ -113,7 +146,7 @@ const insertStatement = () =>
 
 const selectFieldsInfo = () => chain('(', selectFields, ')')();
 
-const selectFields = () => chain(matchTokenType('word'), many(',', matchTokenType('word')))();
+const selectFields = () => chain(wordSym, many(',', wordSym))();
 
 // ----------------------------------- groupBy -----------------------------------
 const groupByStatement = () => chain('group', 'by', fieldList)();
@@ -146,11 +179,7 @@ const overTailExpression = () =>
 
 // ----------------------------------- limit -----------------------------------
 const limitClause = () =>
-  chain('limit', [
-    matchTokenType('number'),
-    chain(matchTokenType('number'), ',', matchTokenType('number'))(),
-    chain(matchTokenType('number'), 'offset', matchTokenType('number'))()
-  ])();
+  chain('limit', [numberSym, chain(numberSym, ',', numberSym)(), chain(numberSym, 'offset', numberSym)()])();
 
 // ----------------------------------- Function -----------------------------------
 const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
@@ -159,7 +188,7 @@ const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')'
 
 const castFunction = () => chain('cast', '(', fieldItem, 'as', dataType, ')')();
 
-const normalFunction = () => chain(matchTokenType('word'), '(', optional(functionFields), ')')();
+const normalFunction = () => chain(wordSym, '(', optional(functionFields), ')')();
 
 const functionFields = () => chain(functionFieldItem, many(',', functionFieldItem))();
 
@@ -167,12 +196,7 @@ const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])(
 
 // ----------------------------------- Case -----------------------------------
 const caseStatement = () =>
-  chain(
-    'case',
-    plus(caseAlternative),
-    optional('else', [matchTokenType('string'), 'null', matchTokenType('number')]),
-    'end'
-  )();
+  chain('case', plus(caseAlternative), optional('else', [stringSym, 'null', numberSym]), 'end')();
 
 const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
@@ -189,14 +213,16 @@ const variableAssignment = () => chain(fieldItem, '=', fieldItem)();
 // TODO: https://github.com/antlr/grammars-v4/blob/master/mysql/MySqlParser.g4#L1963
 const dataType = () =>
   chain([
-    chain(['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext']),
-    chain(['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint']),
-    chain(['real', 'double', 'float']),
-    chain(['decimal', 'numberic']),
-    chain(['date', 'tinyblob', 'blob', 'mediumblob', 'longblob', 'bool', 'boolean']),
-    chain(['bit', 'time', 'timestamp', 'datetime', 'binary', 'varbinary', 'year']),
-    chain(['enum', 'set']),
-    chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')
+    chain(['char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext'])(ast => ast[0]),
+    chain(['tinyint', 'smallint', 'mediumint', 'int', 'integer', 'bigint'])(ast => ast[0]),
+    chain(['real', 'double', 'float'])(ast => ast[0]),
+    chain(['decimal', 'numberic'])(ast => ast[0]),
+    chain(['date', 'tinyblob', 'blob', 'mediumblob', 'longblob', 'bool', 'boolean'])(ast => ast[0]),
+    chain(['bit', 'time', 'timestamp', 'datetime', 'binary', 'varbinary', 'year'])(ast => ast[0]),
+    chain(['enum', 'set'])(ast => ast[0]),
+    chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')(
+      ast => ast[0]
+    )
   ])(ast => ast[0]);
 
 // ----------------------------------- Expression -----------------------------------
@@ -214,7 +240,7 @@ const dataType = () =>
  * | boolean_primary 
 **/
 
-const expression = () => chain(expressionHead, optional(logicalOperator, expression))();
+const expression = () => chain(expressionHead, many(logicalOperator, expression))();
 
 const expressionHead = () =>
   chain([
@@ -258,31 +284,43 @@ const isOrNotExpression = () =>
 const fieldItem = () =>
   chain([
     functionChain,
-    chain(stringOrWordOrNumber, [optional('.', '*'), optional(':', normalFunction), plus('.', stringOrWordOrNumber)])(),
+    chain(
+      stringOrWordOrNumber,
+      optional([chain('.', '*')(ast => '.*'), chain(':', normalFunction)(), plus(dotStringOrWordOrNumber)])
+    )(
+      ast =>
+        // TODO: Ignore others
+        ast[0]
+    ),
     '*'
   ])(ast => ast[0]);
+
+const dotStringOrWordOrNumber = () => chain('.', stringOrWordOrNumber)(ast => ast[0] + ast[1]);
 
 const field = () => createFourOperations(fieldItem)();
 
 // ----------------------------------- create index expression -----------------------------------
 const createIndexStatement = () => chain('create', 'index', indexItem, onStatement, whereStatement)();
 
-const indexItem = () => chain(matchTokenType('string'), many('.', matchTokenType('string')))();
+const indexItem = () => chain(stringSym, many('.', stringSym))();
 
-const onStatement = () => chain('ON', matchTokenType('string'), '(', fieldForIndexList, ')')();
+const onStatement = () => chain('ON', stringSym, '(', fieldForIndexList, ')')();
 
-const fieldForIndex = () => chain(matchTokenType('string'), optional(['ASC', 'DESC']))();
+const fieldForIndex = () => chain(stringSym, optional(['ASC', 'DESC']))();
 
 const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
 
 // ----------------------------------- others -----------------------------------
 
-const stringOrWord = () => chain([matchTokenType('word'), matchTokenType('string')])(ast => ast[0]);
+const wordSym = () => chain([matchTokenType('word'), matchSystemType('cursor')])(ast => ast[0]);
+const stringSym = () => chain(matchTokenType('string'))(ast => ast[0]);
+const numberSym = () => chain(matchTokenType('number'))(ast => ast[0]);
 
-const stringOrWordOrNumber = () =>
-  chain([matchTokenType('word'), matchTokenType('string'), numberChain])(ast => ast[0]);
+const stringOrWord = () => chain([wordSym, stringSym])(ast => ast[0]);
 
-const numberChain = () => chain(optional(['-', '+']), matchTokenType('number'))(ast => ast);
+const stringOrWordOrNumber = () => chain([wordSym, stringSym, numberChain])(ast => ast[0]);
+
+const numberChain = () => chain(optional(['-', '+']), numberSym)();
 
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
 
