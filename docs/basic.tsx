@@ -55,7 +55,31 @@ export default class Page extends React.PureComponent<Props, State> {
         height: 500
       });
 
-      editor.setValue(`select a, b, c, d from e`);
+      editor.setValue(`INSERT INTO
+      map_cem
+    select
+      t2.lat,
+      t2.lng
+    from
+      (
+        SELECT
+          lbs,
+          SPLIT_INDEX(lbs, ',', 0) lat,
+          SPLIT_INDEX(lbs, ',', 1) lng
+        from
+          (
+            SELECT
+              SPLIT_INDEX(body, 'lbs=', 1) as lbs
+            from
+              seattle_join
+            WHERE
+              body like '%lbs=%'
+          ) t1
+      ) t2
+    where
+       FUNCTION_LENGTH (t2.lat) is not null
+      and FUNCTION_LENGTH (t2.lng) is not null
+      and FUNCTION_LENGTH (t2.lat) > 0;`);
 
       editor.onDidChangeModelContent((event: any) => {
         this.editVersion++;

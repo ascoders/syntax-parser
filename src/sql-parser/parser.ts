@@ -126,7 +126,14 @@ const joinPart = () =>
 const alias = () => chain([chain('as', stringOrWord)(), stringOrWord])();
 
 // ----------------------------------- Create table statement -----------------------------------
-const createTableStatement = () => chain('create', 'table', stringOrWord, '(', tableOptions, ')')();
+const createTableStatement = () =>
+  chain('create', 'table', stringOrWord, '(', tableOptions, ')', optional(withStatement))();
+
+const withStatement = () => chain('with', '(', withStatements, ')')();
+
+const withStatements = () => chain(withStatementsTail, many(',', withStatementsTail))();
+
+const withStatementsTail = () => chain(wordSym, '=', stringSym)();
 
 const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
@@ -142,7 +149,18 @@ const createViewStatement = () => chain('create', 'view', wordSym, 'as', selectS
 
 // ----------------------------------- Insert statement -----------------------------------
 const insertStatement = () =>
-  chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])();
+  chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])(ast => {
+    return {
+      type: 'statement',
+      variant: 'insert',
+      into: {
+        type: 'indentifier',
+        variant: 'table',
+        name: ast[3]
+      },
+      result: ast[5]
+    };
+  });
 
 const selectFieldsInfo = () => chain('(', selectFields, ')')();
 
@@ -237,8 +255,8 @@ const dataType = () =>
  * | NOT expr
  * | ! expr
  * | boolean_primary IS [NOT] {TRUE | FALSE | UNKNOWN}
- * | boolean_primary 
-**/
+ * | boolean_primary
+ **/
 
 const expression = () => chain(expressionHead, many(logicalOperator, expression))();
 
@@ -269,7 +287,7 @@ const booleanPrimary = () =>
  *  | field [NOT] LIKE simple_expr [ESCAPE simple_expr]
  *  | field [NOT] REGEXP field
  *  | field
-**/
+ **/
 const predicate = () =>
   chain(field, optional([chain(comparisonOperator, field)(), chain('sounds', 'like', field)(), isOrNotExpression]))();
 

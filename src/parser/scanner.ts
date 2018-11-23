@@ -6,7 +6,7 @@ export class Scanner {
 
   constructor(tokens: IToken[], index = 0) {
     // ignore whitespace, comment
-    this.tokens = tokens;
+    this.tokens = tokens.slice();
     this.index = index;
   }
 

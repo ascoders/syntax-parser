@@ -1,10 +1,9 @@
 import { defaults, get, set, uniq, uniqBy } from 'lodash';
 import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
-import { cursorSymbol } from './definition';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
-import { getPathFromObjectByValue, getTokenValue, tailCallOptimize } from './utils';
+import { getPathByCursorIndexFromAst, tailCallOptimize } from './utils';
 
 const parserMap = new Map<ChainFunction, Parser>();
 
@@ -57,7 +56,6 @@ class VisiterOption {
   public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
   public generateAst?: boolean = true;
   public enableFirstSet?: boolean = true;
-  public cursorToken?: IToken = null;
 }
 
 class MatchNode {
@@ -216,25 +214,20 @@ interface IChance {
   tokenIndex: number;
 }
 
-export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string, cursorIndex: number = null) => {
-  const startTime = new Date();
-  const tokens = lexer(text);
-  const lexerTime = new Date();
-  const scanner = new Scanner(tokens);
-
-  let parser: Parser = null;
-
+function getParser(root: ChainFunction) {
   if (parserMap.has(root)) {
-    parser = parserMap.get(root);
+    return parserMap.get(root);
   } else {
-    parser = new Parser();
+    const parser = new Parser();
     parser.rootChainNode = root()(null, null, 0, parser);
     parserMap.set(root, parser);
+    return parser;
   }
+}
 
+function scannerAddCursorToken(scanner: Scanner, cursorIndex: number) {
   // Find where token cursorIndex is in.
   const cursorToken = scanner.getTokenByCharacterIndex(cursorIndex);
-  const cursorPrevToken = scanner.getPrevTokenByCharacterIndex(cursorIndex).prevToken;
 
   // Generate cursor token, if cursor position is not in a token.
   // Return cursor token.
@@ -251,6 +244,19 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     scanner.addToken(cursorAddonToken);
   }
 
+  return scanner;
+}
+
+export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string, cursorIndex: number = null) => {
+  const startTime = new Date();
+  const tokens = lexer(text);
+  const lexerTime = new Date();
+  const originScanner = new Scanner(tokens);
+  const scanner = scannerAddCursorToken(new Scanner(tokens), cursorIndex);
+  const parser = getParser(root);
+
+  const cursorPrevToken = scanner.getPrevTokenByCharacterIndex(cursorIndex).prevToken;
+
   // If cursorPrevToken is null, the cursor prev node is root.
   let cursorPrevNodes: Node[] = cursorPrevToken === null ? [parser.rootChainNode] : [];
 
@@ -264,10 +270,10 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     token: IToken;
   } = null;
 
+  // Parse without cursor token
   newVisiter({
     node: parser.rootChainNode,
-    scanner,
-    cursorToken: cursorAddonToken,
+    scanner: originScanner,
     visiterOption: {
       onCallVisiter: (node, store) => {
         callVisiterCount++;
@@ -281,12 +287,6 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
         if (callParentCount > MAX_VISITER_CALL) {
           store.stop = true;
         }
-      },
-      onSuccess: () => {
-        success = true;
-        ast = parser.rootChainNode.solveAst
-          ? parser.rootChainNode.solveAst(parser.rootChainNode.astResults)
-          : parser.rootChainNode.astResults;
       },
       onMatchNode: (matchNode, store, currentVisiterOption) => {
         const matchResult = matchNode.run(store.scanner);
@@ -307,16 +307,61 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
             };
           }
 
+          visitNextNodeFromParent(matchNode, store, currentVisiterOption, {
+            token: true,
+            ...matchResult.token
+          });
+        }
+      },
+      onSuccess: () => {
+        success = true;
+      },
+      onFail: node => {
+        success = false;
+      }
+    },
+    parser
+  });
+
+  // Parse with curosr token
+  newVisiter({
+    node: parser.rootChainNode,
+    scanner,
+    visiterOption: {
+      onCallVisiter: (node, store) => {
+        callVisiterCount++;
+
+        if (callVisiterCount > MAX_VISITER_CALL) {
+          store.stop = true;
+        }
+      },
+      onVisiterNextNode: (node, store) => {
+        callParentCount++;
+        if (callParentCount > MAX_VISITER_CALL) {
+          store.stop = true;
+        }
+      },
+      onSuccess: () => {
+        ast = parser.rootChainNode.solveAst
+          ? parser.rootChainNode.solveAst(parser.rootChainNode.astResults)
+          : parser.rootChainNode.astResults;
+      },
+      onMatchNode: (matchNode, store, currentVisiterOption) => {
+        const matchResult = matchNode.run(store.scanner);
+
+        if (!matchResult.match) {
+          tryChances(matchNode, store, currentVisiterOption);
+        } else {
           // If cursor prev token isn't null, it may a cursor prev node.
           if (cursorPrevToken !== null && matchResult.token === cursorPrevToken) {
             cursorPrevNodes.push(matchNode);
           }
 
-          visitNextNodeFromParent(matchNode, store, currentVisiterOption, getTokenValue(matchResult.token));
+          visitNextNodeFromParent(matchNode, store, currentVisiterOption, {
+            token: true,
+            ...matchResult.token
+          });
         }
-      },
-      onFail: node => {
-        success = false;
       }
     },
     parser
@@ -381,7 +426,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   const parserTime = new Date();
 
   // Find cursor ast from whole ast.
-  const cursorKeyFullPath = getPathFromObjectByValue(ast, cursorSymbol);
+  const cursorKeyFullPath = getPathByCursorIndexFromAst(ast, cursorIndex);
   const cursorKeyFullPaths = cursorKeyFullPath.split('.');
   const cursorKeyFullParentPath = cursorKeyFullPaths.slice(0, cursorKeyFullPaths.length - 1).join('.');
   const cursorKeyPath = cursorKeyFullPaths.slice().pop();
@@ -393,7 +438,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
     ast,
     callVisiterCount,
     cursorParentAst,
-    cursorKeyPath,
+    cursorKeyPath: cursorKeyPath === '' ? null : cursorKeyPath,
     nextMatchings: nextMatchNodes
       .reverse()
       .map(each => each.matching)
@@ -411,17 +456,14 @@ function newVisiter({
   node,
   scanner,
   visiterOption,
-  parser,
-  cursorToken
+  parser
 }: {
   node: Node;
   scanner: Scanner;
   visiterOption: VisiterOption;
   parser: Parser;
-  cursorToken?: IToken;
 }) {
   const defaultVisiterOption = new VisiterOption();
-  defaultVisiterOption.cursorToken = cursorToken;
   defaults(visiterOption, defaultVisiterOption);
 
   const newStore = new VisiterStore(scanner, parser);

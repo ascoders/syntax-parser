@@ -1,6 +1,5 @@
 import { IToken } from 'src/lexer/token';
 import { IAst } from './chain';
-import { cursorSymbol } from './definition';
 
 export const binaryRecursionToArray = (ast: IAst[]) => {
   if (ast[1]) {
@@ -27,31 +26,23 @@ export function tailCallOptimize<T>(f: T): T {
   } as any;
 }
 
-export function getTokenValue(token: IToken) {
-  if (token.systemType === null) {
-    return token.value;
-  } else {
-    switch (token.systemType) {
-      case 'cursor':
-        return cursorSymbol;
-      default:
-        return null;
-    }
-  }
-}
-
-export function getPathFromObjectByValue(obj: any, val: any, path?: string) {
+export function getPathByCursorIndexFromAst(obj: any, cursorIndex: number, path?: string) {
   path = path || '';
   let fullpath = '';
   for (const key in obj) {
-    if (obj[key] === val) {
+    if (
+      obj[key] &&
+      obj[key].token === true &&
+      obj[key].position[0] <= cursorIndex &&
+      obj[key].position[1] >= cursorIndex
+    ) {
       if (path === '') {
         return key;
       } else {
         return path + '.' + key;
       }
     } else if (typeof obj[key] === 'object') {
-      fullpath = getPathFromObjectByValue(obj[key], val, path === '' ? key : path + '.' + key) || fullpath;
+      fullpath = getPathByCursorIndexFromAst(obj[key], cursorIndex, path === '' ? key : path + '.' + key) || fullpath;
     }
   }
   return fullpath;
