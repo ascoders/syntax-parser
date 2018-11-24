@@ -1,5 +1,11 @@
-import { IToken } from 'src/lexer/token';
 import { IAst } from './chain';
+
+export const compareIgnoreLowerCaseWhenString = (source: any, target: any) => {
+  if (typeof source === 'string' && typeof target === 'string') {
+    return source.toLowerCase() === target.toLowerCase();
+  }
+  return source === target;
+};
 
 export const binaryRecursionToArray = (ast: IAst[]) => {
   if (ast[1]) {

@@ -3,7 +3,7 @@ import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
 import { IMatch, match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
-import { getPathByCursorIndexFromAst, tailCallOptimize } from './utils';
+import { compareIgnoreLowerCaseWhenString, getPathByCursorIndexFromAst, tailCallOptimize } from './utils';
 
 const parserMap = new Map<ChainFunction, Parser>();
 
@@ -234,10 +234,9 @@ function scannerAddCursorToken(scanner: Scanner, cursorIndex: number) {
   let cursorAddonToken = cursorToken;
 
   if (!cursorAddonToken && cursorIndex !== null) {
-    // If cursor not on token, add `cursorToken` to tokens!
+    // If cursor not on token, add a match-all token.
     cursorAddonToken = {
-      systemType: 'cursor',
-      type: null,
+      type: 'matchAll',
       value: null,
       position: [cursorIndex, cursorIndex]
     };
@@ -379,14 +378,11 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
 
   nextMatchNodes = uniqBy(nextMatchNodes, each => each.matching.type + each.matching.value);
 
-  // If has next token, see whether the double next match node match this next token.
+  // If has next token, filter nextMatchNodes by cursorNextToken
   const cursorNextToken = scanner.getNextTokenFromCharacterIndex(cursorIndex);
-
   if (cursorNextToken) {
-    nextMatchNodes = nextMatchNodes.filter(nextMatchNode =>
-      findNextMatchNodes(nextMatchNode, parser).some(
-        nextNextMatchNode => nextNextMatchNode.matching.value === cursorNextToken.value
-      )
+    nextMatchNodes = nextMatchNodes.filter(
+      nextMatchNode => !compareIgnoreLowerCaseWhenString(nextMatchNode.matching.value, cursorNextToken.value)
     );
   }
 

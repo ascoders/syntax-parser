@@ -1,6 +1,7 @@
-import { chain, createParser, many, matchSystemType, matchTokenType, optional, plus } from '../parser';
+import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './lexer';
+import { reserveKeys } from './reserve-keys';
 import { flattenAll } from './utils';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
@@ -330,7 +331,7 @@ const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))()
 
 // ----------------------------------- others -----------------------------------
 
-const wordSym = () => chain([matchTokenType('word'), matchSystemType('cursor')])(ast => ast[0]);
+const wordSym = () => chain(matchTokenType('word', { excludes: reserveKeys }))(ast => ast[0]);
 const stringSym = () => chain(matchTokenType('string'))(ast => ast[0]);
 const numberSym = () => chain(matchTokenType('number'))(ast => ast[0]);
 

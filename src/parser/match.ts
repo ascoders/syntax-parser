@@ -63,7 +63,17 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) =
 }
 
 export const match = createMatch((scanner, word: string | string[], isCostToken) =>
-  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
+  matchToken(
+    scanner,
+    token => {
+      if (token.type === 'matchAll') {
+        return true;
+      }
+
+      return equalWordOrIncludeWords(token.value, word);
+    },
+    isCostToken
+  )
 );
 
 interface IMatchTokenTypeOption {
@@ -95,22 +105,6 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
       isCostToken
     );
   }, tokenType)();
-};
-
-export const matchSystemType = (systemType: string) => {
-  return createMatch((scanner, word, isCostToken) => {
-    return matchToken(
-      scanner,
-      token => {
-        if (token.systemType !== systemType) {
-          return false;
-        }
-
-        return true;
-      },
-      isCostToken
-    );
-  })();
 };
 
 export const matchTrue = (): IMatch => ({
