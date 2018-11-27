@@ -1,6 +1,7 @@
 import * as _ from 'lodash';
 import { IToken } from '../lexer/token';
-import { chain, IElements, ISolveAst } from './chain';
+import { chain } from './chain';
+import { IElements } from './define';
 import { Scanner } from './scanner';
 
 export interface IMatch {
@@ -63,17 +64,7 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) =
 }
 
 export const match = createMatch((scanner, word: string | string[], isCostToken) =>
-  matchToken(
-    scanner,
-    token => {
-      if (token.type === 'matchAll') {
-        return true;
-      }
-
-      return equalWordOrIncludeWords(token.value, word);
-    },
-    isCostToken
-  )
+  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
 );
 
 interface IMatchTokenTypeOption {

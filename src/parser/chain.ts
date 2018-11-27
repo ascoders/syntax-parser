@@ -1,124 +1,28 @@
-import { defaults, get, set, uniq, uniqBy } from 'lodash';
+import { defaults, uniq, uniqBy } from 'lodash';
 import { Lexer } from '../lexer';
 import { IToken } from '../lexer/token';
-import { IMatch, match, matchFalse, matchTrue } from './match';
+import {
+  Chain,
+  ChainFunction,
+  ChainNode,
+  ChainNodeFactory,
+  FirstOrFunctionSet,
+  FunctionNode,
+  IElement,
+  IParseResult,
+  MatchNode,
+  MAX_VISITER_CALL,
+  Node,
+  ParentNode,
+  Parser,
+  parserMap,
+  TreeNode,
+  VisiterOption,
+  VisiterStore
+} from './define';
+import { match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
 import { compareIgnoreLowerCaseWhenString, getPathByCursorIndexFromAst, tailCallOptimize } from './utils';
-
-const parserMap = new Map<ChainFunction, Parser>();
-
-class Parser {
-  public rootChainNode: ChainNode = null;
-  public firstSet = new Map<ChainFunction, MatchNode[]>();
-  public firstOrFunctionSet = new Map<ChainFunction, FirstOrFunctionSet[]>();
-  public relatedSet = new Map<ChainFunction, Set<ChainFunction>>();
-}
-
-type FirstOrFunctionSet = MatchNode | ChainFunction;
-
-// tslint:disable:max-classes-per-file
-
-export type IMatchFn = (scanner: Scanner, isCostToken: boolean) => IMatch;
-
-// IToken | Array<IToken> | any return object from resolveAst().
-export type IAst = IToken | any;
-
-export type Node = MatchNode | FunctionNode | TreeNode | ChainNode;
-
-export type ParentNode = TreeNode | ChainNode;
-
-export interface IMatching {
-  // loose not cost token, and result is fixed true of false.
-  type: 'string' | 'loose' | 'special';
-  value: string | boolean;
-}
-
-const MAX_VISITER_CALL = 1000000;
-
-class VisiterStore {
-  public restChances: IChance[] = [];
-  public nextMatchNodeFinders = new Set<{
-    node: ParentNode;
-    childIndex: number;
-  }>();
-  public stop = false;
-  // TODO:
-  public cursorAst?: IAst = null;
-
-  constructor(public scanner: Scanner, public parser: Parser) {}
-}
-
-class VisiterOption {
-  public onCallVisiter?: (node?: Node, store?: VisiterStore) => void;
-  public onVisiterNextNode?: (node?: Node, store?: VisiterStore) => void;
-  public onSuccess?: () => void;
-  public onFail?: (lastNode?: Node) => void;
-  public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
-  public generateAst?: boolean = true;
-  public enableFirstSet?: boolean = true;
-}
-
-class MatchNode {
-  public parentNode: ParentNode;
-
-  constructor(private matchFunction: IMatchFn, public matching: IMatching, public parentIndex: number) {}
-
-  public run = (scanner: Scanner, isCostToken = true) => this.matchFunction(scanner, isCostToken);
-}
-
-export class FunctionNode {
-  public parentNode: ParentNode;
-
-  constructor(public chainFunction: ChainFunction, public parentIndex: number, public parser: Parser) {}
-
-  public run = () => {
-    return this.chainFunction()(this.parentNode, this.chainFunction, this.parentIndex, this.parser);
-  };
-}
-
-interface INextMatchNode {
-  matchNode: MatchNode | boolean;
-  nextChances: IChance[];
-  ready: boolean;
-}
-
-class TreeNode {
-  public parentNode: ParentNode;
-  public childs: Node[] = [];
-
-  constructor(public parentIndex: number) {}
-}
-
-export class ChainNode {
-  public parentNode: ParentNode;
-  public childs: Node[] = [];
-
-  public astResults?: IAst[] = [];
-
-  // Eg: const foo = chain => chain()(), so the chain creatorFunction is 'foo'.
-  public creatorFunction: ChainFunction = null;
-
-  public solveAst: ISolveAst = null;
-
-  constructor(public parentIndex: number) {}
-}
-
-type SingleElement = string | any;
-export type IElement = SingleElement | SingleElement[];
-export type IElements = IElement[];
-export type ISolveAst = (astResult: IAst[]) => IAst;
-
-export type Chain = (...elements: IElements) => (solveAst?: ISolveAst) => ChainNodeFactory;
-
-export type ChainNodeFactory = (
-  parentNode?: ParentNode,
-  // If parent node is a function, here will get it's name.
-  creatorFunction?: ChainFunction,
-  parentIndex?: number,
-  parser?: Parser
-) => ChainNode;
-
-export type ChainFunction = () => ChainNodeFactory;
 
 const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIndex: number, parser: Parser): Node => {
   if (element instanceof Array) {
@@ -208,12 +112,6 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
   return chainNodeFactory;
 };
 
-interface IChance {
-  node: ParentNode;
-  childIndex: number;
-  tokenIndex: number;
-}
-
 function getParser(root: ChainFunction) {
   if (parserMap.has(root)) {
     return parserMap.get(root);
@@ -231,22 +129,22 @@ function scannerAddCursorToken(scanner: Scanner, cursorIndex: number) {
 
   // Generate cursor token, if cursor position is not in a token.
   // Return cursor token.
-  let cursorAddonToken = cursorToken;
-
-  if (!cursorAddonToken && cursorIndex !== null) {
+  if (!cursorToken && cursorIndex !== null) {
     // If cursor not on token, add a match-all token.
-    cursorAddonToken = {
-      type: 'matchAll',
+    scanner.addToken({
+      type: 'cursor',
       value: null,
       position: [cursorIndex, cursorIndex]
-    };
-    scanner.addToken(cursorAddonToken);
+    });
   }
 
   return scanner;
 }
 
-export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string, cursorIndex: number = null) => {
+export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer) => (
+  text: string,
+  cursorIndex: number = null
+): IParseResult => {
   const startTime = new Date();
   const tokens = lexer(text);
   const lexerTime = new Date();
@@ -260,7 +158,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   let cursorPrevNodes: Node[] = cursorPrevToken === null ? [parser.rootChainNode] : [];
 
   let success: boolean = false;
-  let ast: IAst = null;
+  let ast: AST = null;
   let callVisiterCount = 0;
   let callParentCount = 0;
   let lastMatchUnderShortestRestToken: {
@@ -387,11 +285,7 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   }
 
   // Get error message
-  let error: {
-    token: IToken;
-    reason: 'wrong' | 'incomplete';
-    suggestions: IMatching[];
-  } = null;
+  let error: IParseResult['error'] = null;
 
   if (!success) {
     const suggestions = uniqBy(
@@ -422,28 +316,25 @@ export const createParser = (root: ChainFunction, lexer: Lexer) => (text: string
   const parserTime = new Date();
 
   // Find cursor ast from whole ast.
-  const cursorKeyFullPath = getPathByCursorIndexFromAst(ast, cursorIndex);
-  const cursorKeyFullPaths = cursorKeyFullPath.split('.');
-  const cursorKeyFullParentPath = cursorKeyFullPaths.slice(0, cursorKeyFullPaths.length - 1).join('.');
-  const cursorKeyPath = cursorKeyFullPaths.slice().pop();
-  const cursorParentAst = get(ast, cursorKeyFullParentPath);
+  const cursorKeyPath = getPathByCursorIndexFromAst(ast, cursorIndex).split('.');
 
   return {
-    rootChainNode: parser.rootChainNode,
     success,
     ast,
-    callVisiterCount,
-    cursorParentAst,
-    cursorKeyPath: cursorKeyPath === '' ? null : cursorKeyPath,
+    cursorKeyPath: cursorKeyPath[0] === '' ? [] : cursorKeyPath,
     nextMatchings: nextMatchNodes
       .reverse()
       .map(each => each.matching)
       .filter(each => !!each.value),
     error,
-    tokens,
-    costs: {
-      lexer: lexerTime.getTime() - startTime.getTime(),
-      parser: parserTime.getTime() - startTime.getTime()
+    debugInfo: {
+      tokens,
+      callVisiterCount,
+      rootChainNode: parser.rootChainNode,
+      costs: {
+        lexer: lexerTime.getTime() - startTime.getTime(),
+        parser: parserTime.getTime() - startTime.getTime()
+      }
     }
   };
 };

@@ -1,4 +1,5 @@
 import { chain, createParser, many, matchTokenType, optional, plus } from '../parser';
+import { IStatements } from './define';
 import { createFourOperations } from './four-operations';
 import { sqlTokenizer } from './lexer';
 import { reserveKeys } from './reserve-keys';
@@ -6,7 +7,7 @@ import { flattenAll } from './utils';
 
 const root = () => chain(statements, optional(';'))(ast => ast[0]);
 
-const statements = () => chain(statement, many(';', statement))(ast => ast[0]);
+const statements = () => chain(statement, many(chain(';', statement)(ast => ast[1])))(flattenAll);
 
 const statement = () =>
   chain([
@@ -52,8 +53,6 @@ const selectList = () => chain(selectField, many(selectListTail))(flattenAll);
 
 const selectListTail = () => chain(',', selectField)(ast => ast[1]);
 
-const whereStatement = () => chain('where', expression)(ast => ast[1]);
-
 // selectField
 //         ::= not? field alias?
 //         ::= not? ( field ) alias?
@@ -73,21 +72,22 @@ const selectField = () =>
         caseStatement
       ],
       optional(alias)
-    )(
-      ast =>
-        // TODO: Ignore not and alias
-        ast[1]
-    ),
+    )(ast => ({
+      type: 'identifier',
+      variant: 'column',
+      name: ast[1],
+      alias: ast[2]
+    })),
     '*'
   ])(ast => ast[0]);
+
+const whereStatement = () => chain('where', expression)(ast => ast[1]);
 
 // fieldList
 //       ::= field (, fieldList)?
 const fieldList = () => chain(field, many(',', field))();
 
-const tableSources = () => chain(tableSource, many(tableSourcesTail))(flattenAll);
-
-const tableSourcesTail = () => chain(',', tableSource)(ast => ast[1]);
+const tableSources = () => chain(tableSource, many(chain(',', tableSource)(ast => ast[1])))(flattenAll);
 
 const tableSource = () =>
   chain(tableSourceItem, many(joinPart))(
@@ -98,11 +98,12 @@ const tableSource = () =>
 
 const tableSourceItem = () =>
   chain([
-    chain(tableName, optional(alias))(
-      ast =>
-        // TODO: Ignore alias
-        ast[0]
-    ),
+    chain(tableName, optional(alias))(ast => ({
+      type: 'identifier',
+      variant: 'table',
+      name: ast[0],
+      alias: ast[1]
+    })),
     chain([selectStatement, chain('(', selectStatement, ')')(ast => ast[1])], alias)(ast => ({
       ...ast[0],
       alias: ast[1]
@@ -124,7 +125,7 @@ const joinPart = () =>
 
 // Alias ::= AS WordOrString
 //         | WordOrString
-const alias = () => chain([chain('as', stringOrWord)(), stringOrWord])();
+const alias = () => chain([chain('as', stringOrWord)(ast => ast[1]), stringOrWord])(ast => ast[0]);
 
 // ----------------------------------- Create table statement -----------------------------------
 const createTableStatement = () =>
@@ -331,7 +332,8 @@ const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))()
 
 // ----------------------------------- others -----------------------------------
 
-const wordSym = () => chain(matchTokenType('word', { excludes: reserveKeys }))(ast => ast[0]);
+const wordSym = () =>
+  chain([matchTokenType('cursor'), matchTokenType('word', { excludes: reserveKeys })])(ast => ast[0]);
 const stringSym = () => chain(matchTokenType('string'))(ast => ast[0]);
 const numberSym = () => chain(matchTokenType('number'))(ast => ast[0]);
 
@@ -362,4 +364,4 @@ const selectSpec = () =>
     'sql_calc_found_rows'
   ])(ast => ast[0]);
 
-export const sqlParser = createParser(root, sqlTokenizer);
+export const sqlParser = createParser<IStatements>(root, sqlTokenizer);

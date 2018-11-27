@@ -1,4 +1,4 @@
-import { IAst } from './chain';
+import { IAst } from './define';
 
 export const compareIgnoreLowerCaseWhenString = (source: any, target: any) => {
   if (typeof source === 'string' && typeof target === 'string') {
@@ -40,7 +40,7 @@ export function getPathByCursorIndexFromAst(obj: any, cursorIndex: number, path?
       obj[key] &&
       obj[key].token === true &&
       obj[key].position[0] <= cursorIndex &&
-      obj[key].position[1] >= cursorIndex
+      obj[key].position[1] + 1 >= cursorIndex
     ) {
       if (path === '') {
         return key;
