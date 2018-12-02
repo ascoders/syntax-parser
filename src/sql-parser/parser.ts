@@ -16,7 +16,8 @@ const statement = () =>
     insertStatement,
     createViewStatement,
     setStatement,
-    createIndexStatement
+    createIndexStatement,
+    createFunctionStatement
   ])(ast => ast[0]);
 
 // ----------------------------------- select statement -----------------------------------
@@ -139,9 +140,36 @@ const withStatementsTail = () => chain(wordSym, '=', stringSym)();
 
 const tableOptions = () => chain(tableOption, many(',', tableOption))();
 
-const tableOption = () => chain(stringOrWord, dataType)();
+const tableOption = () =>
+  chain([
+    chain(stringOrWord, dataType)(),
+    chain('primary', 'key', '(', primaryKeyList, ')')(),
+    chain('period', 'for', 'system_time')()
+  ])();
 
-const tableName = () => chain([wordSym, chain(wordSym, '.', wordSym)()])(ast => ast[0]);
+const primaryKeyList = () => chain(wordSym, optional(',', primaryKeyList))();
+
+const tableName = () =>
+  chain(
+    [chain(wordSym)(), chain(wordSym, '.', wordSym)(ast => [ast[0], ast[2]])],
+    optional(chain('for', 'system_time', 'as', 'of', 'proctime', '(', ')')())
+  )(ast => {
+    if (ast[0].length === 1) {
+      return {
+        type: 'identifier',
+        variant: 'tableName',
+        namespace: null,
+        tableName: ast[0][0]
+      };
+    } else {
+      return {
+        type: 'identifier',
+        variant: 'tableName',
+        namespace: ast[0][0],
+        tableName: ast[0][1]
+      };
+    }
+  });
 
 // ----------------------------------- Having --------------------------------------------------
 const havingStatement = () => chain('having', expression)();
@@ -183,7 +211,7 @@ const orderByExpression = () => chain(expression, optional(['asc', 'desc']))();
 PARTITION BY value_expression , ... [ n ] 
 */
 
-const partitionByClause = () => chain('partition', 'by', expression)(ast => ast);
+const partitionByClause = () => chain([wordSym, chain('partition', 'by', expression)()])(ast => ast);
 
 /*
 OVER (   
@@ -329,6 +357,9 @@ const onStatement = () => chain('ON', stringSym, '(', fieldForIndexList, ')')();
 const fieldForIndex = () => chain(stringSym, optional(['ASC', 'DESC']))();
 
 const fieldForIndexList = () => chain(fieldForIndex, many(',', fieldForIndex))();
+
+// ----------------------------------- create function expression -----------------------------------
+const createFunctionStatement = () => chain('create', 'function', wordSym, 'as', stringSym)();
 
 // ----------------------------------- others -----------------------------------
 

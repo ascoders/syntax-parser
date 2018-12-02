@@ -1,12 +1,17 @@
 import * as _ from 'lodash';
 import { IToken } from '../lexer/token';
-import { IFrom, ISelectStatement, IStatement, IStatements } from './define';
+import { ICompletionItem, IFrom, ISelectStatement, IStatement, IStatements, ITableInfo } from './define';
 
-type CursorType = 'tableField' | 'tableName';
+type CursorType = 'tableField' | 'tableName' | 'namespace';
 
-type IGetFieldsByTableName = (tableName: string) => Promise<any>;
+export type ICursorInfo<T = {}> = {
+  token: IToken;
+  type: CursorType;
+} & T;
 
-export function getCursorInfo(rootStatement: IStatements, keyPath: string[]) {
+type IGetFieldsByTableName = (tableName: ITableInfo, inputValue: string) => Promise<ICompletionItem[]>;
+
+export async function getCursorInfo(rootStatement: IStatements, keyPath: string[]) {
   if (!rootStatement) {
     return null;
   }
@@ -19,29 +24,33 @@ export function getCursorInfo(rootStatement: IStatements, keyPath: string[]) {
     return null;
   }
 
-  return judgeStatement(parentStatement, typePlusVariant => {
-    let cursorType: CursorType = null;
+  return (await judgeStatement(parentStatement, async typePlusVariant => {
     switch (typePlusVariant) {
-      case 'identifier.table':
-        if (cursorKey === 'name') {
-          cursorType = 'tableName';
+      case 'identifier.tableName':
+        if (cursorKey === 'tableName') {
+          return {
+            type: 'tableName',
+            token: cursorValue,
+            tableInfo: parentStatement
+          };
+        } else if (cursorKey === 'namespace') {
+          return {
+            type: 'namespace',
+            token: cursorValue,
+            tableInfo: parentStatement
+          };
         }
-        break;
+
       case 'identifier.column':
         if (cursorKey === 'name') {
-          cursorType = 'tableField';
+          return {
+            type: 'tableField',
+            token: cursorValue
+          };
         }
-        break;
       default:
     }
-    return {
-      type: cursorType,
-      value: cursorValue.value
-    };
-  }) as {
-    value: string;
-    type: CursorType;
-  };
+  })) as ICursorInfo;
 }
 
 export function findNearestStatement(rootStatement: IStatements, keyPath: string[]): ISelectStatement {
@@ -70,33 +79,89 @@ export function findNearestStatement(rootStatement: IStatements, keyPath: string
   }
 }
 
-export async function getFieldsFromStatement(statement: ISelectStatement, getFieldsByTableName: IGetFieldsByTableName) {
+export async function getFieldsFromStatement(
+  statement: ISelectStatement,
+  cursorInfo: ICursorInfo,
+  getFieldsByTableName: IGetFieldsByTableName
+) {
   if (!statement) {
-    return null;
+    return [];
   }
 
   switch (statement.variant) {
     // Select statement
     case 'select':
-      const from: IFrom[] = _.get(statement, 'from', []);
-      return _.flatten(await Promise.all(from.map(source => getFieldsByFromClause(source, getFieldsByTableName))));
+      return getFieldsByFromClauses(_.get(statement, 'from', []), cursorInfo, getFieldsByTableName);
     default:
   }
+
+  return [];
 }
 
-async function getFieldsByFromClause(fromStatement: IFrom, getFieldsByTableName: IGetFieldsByTableName) {
-  return judgeStatement(fromStatement, typePlusVariant => {
+async function getFieldsByFromClauses(
+  fromStatements: IStatement[],
+  cursorInfo: ICursorInfo,
+  getFieldsByTableName: IGetFieldsByTableName
+): Promise<ICompletionItem[]> {
+  const fields = await Promise.all(
+    fromStatements.map(fromStatement => getFieldsByFromClause(fromStatement, cursorInfo, getFieldsByTableName))
+  );
+  return _.flatten(fields).filter(item => !!item);
+}
+
+async function getFieldsByFromClause(
+  fromStatement: IStatement,
+  cursorInfo: ICursorInfo,
+  getFieldsByTableName: IGetFieldsByTableName
+) {
+  return judgeStatement(fromStatement, async typePlusVariant => {
     switch (typePlusVariant) {
       case 'identifier.table':
-        return getFieldsByTableName(fromStatement.name.value);
+        const itFromStatement = fromStatement as IFrom;
+        const originFields = await getFieldsByTableName(itFromStatement.name, cursorInfo.token.value);
+        originFields.forEach(originField => (originField.tableName = itFromStatement.name));
+        return originFields;
+      case 'statement.select':
+        const ssFromStatement = fromStatement as ISelectStatement;
+        const fields = await getFieldsByFromClauses(ssFromStatement.from, cursorInfo, getFieldsByTableName);
+
+        // If select *, return all fields
+        if (ssFromStatement.result.length === 1 && ssFromStatement.result[0].name.value === '*') {
+          return fields;
+        }
+
+        return fields.filter(field => ssFromStatement.result.find(result => result.name.value === field.label));
+      default:
+        return null;
     }
   });
 }
 
-function judgeStatement<T>(statement: IStatement, callback: (typePlusVariant?: string) => T): T {
+async function judgeStatement<T>(
+  statement: IStatement,
+  callback: (typePlusVariant?: string) => Promise<T>
+): Promise<T> {
   if (!statement) {
     return null;
   }
 
   return callback(statement.type + '.' + statement.variant);
+}
+
+export async function findTableName(
+  rootStatement: IStatements,
+  cursorInfo: ICursorInfo,
+  getFieldsByTableName: IGetFieldsByTableName,
+  fieldKeyPath: string[]
+): Promise<ITableInfo> {
+  const fieldStatement = findNearestStatement(rootStatement, fieldKeyPath);
+  const fields = await getFieldsFromStatement(fieldStatement, cursorInfo, getFieldsByTableName);
+
+  const field = fields.find(eachField => eachField.label === cursorInfo.token.value);
+
+  if (!field) {
+    return null;
+  }
+
+  return field.tableName;
 }

@@ -12,9 +12,24 @@ export interface ISelectStatement extends IStatement {
   result: IResult[];
 }
 
-export interface IResult {}
-
-export interface IFrom extends IStatement {
+export interface IResult extends IStatement {
   name: IToken;
   alias: IToken;
+}
+
+export interface IFrom extends IStatement {
+  name: ITableInfo & IStatement;
+  alias: IToken;
+}
+
+export interface ITableInfo {
+  tableName: IToken;
+  namespace: IToken;
+}
+
+export interface ICompletionItem {
+  label: string;
+  kind: string;
+  sortText: string;
+  tableName?: ITableInfo;
 }
