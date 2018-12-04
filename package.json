@@ -1,6 +1,6 @@
 {
   "name": "syntax-parser",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "pri": {
     "type": "component"
   },
@@ -27,7 +27,6 @@
     "react-dom": ">=16.0.0"
   },
   "dependencies": {
-    "@babel/runtime": "^7.0.0",
-    "worker-loader": "^2.0.0"
+    "@babel/runtime": "^7.0.0"
   }
 }
