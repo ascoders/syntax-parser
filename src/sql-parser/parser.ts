@@ -44,10 +44,14 @@ const selectStatement = () =>
 const union = () => chain('union', ['all', 'distinct'])();
 
 const fromClause = () =>
-  chain('from', tableSources, optional(whereStatement), optional(groupByStatement), optional(havingStatement))(
-    ast =>
-      // TODO: Ignore where group having
-      ast[1]
+  chain('from', tableSources, optional(whereStatement), optional(groupByStatement), optional(havingStatement))(ast =>
+    // TODO: Ignore where group having
+    ({
+      sources: ast[1],
+      where: ast[2],
+      group: ast[3],
+      having: ast[4]
+    })
   );
 
 const selectList = () => chain(selectField, many(selectListTail))(flattenAll);
@@ -86,7 +90,7 @@ const whereStatement = () => chain('where', expression)(ast => ast[1]);
 
 // fieldList
 //       ::= field (, fieldList)?
-const fieldList = () => chain(field, many(',', field))();
+const fieldList = () => chain(columnField, many(',', columnField))();
 
 const tableSources = () => chain(tableSource, many(chain(',', tableSource)(ast => ast[1])))(flattenAll);
 
@@ -230,21 +234,42 @@ const limitClause = () =>
   chain('limit', [numberSym, chain(numberSym, ',', numberSym)(), chain(numberSym, 'offset', numberSym)()])();
 
 // ----------------------------------- Function -----------------------------------
-const functionChain = () => chain([castFunction, normalFunction, ifFunction])();
+const functionChain = () => chain([castFunction, normalFunction, ifFunction])(ast => ast[0]);
 
-const ifFunction = () => chain('if', '(', predicate, ',', field, ',', field, ')')();
+const ifFunction = () =>
+  chain('if', '(', predicate, ',', field, ',', field, ')')(ast => ({
+    type: 'function',
+    name: 'if',
+    args: [ast[2], ast[4], ast[6]]
+  }));
 
-const castFunction = () => chain('cast', '(', fieldItem, 'as', dataType, ')')();
+const castFunction = () =>
+  chain('cast', '(', fieldItem, 'as', dataType, ')')(ast => ({
+    type: 'function',
+    name: 'cast',
+    args: [ast[2], ast[4]]
+  }));
 
-const normalFunction = () => chain(wordSym, '(', optional(functionFields), ')')();
+const normalFunction = () =>
+  chain(wordSym, '(', optional(functionFields), ')')(ast => ({
+    type: 'function',
+    name: ast[0],
+    args: ast[2]
+  }));
 
 const functionFields = () => chain(functionFieldItem, many(',', functionFieldItem))();
 
-const functionFieldItem = () => chain(many(selectSpec), [field, caseStatement])();
+const functionFieldItem = () =>
+  chain(many(selectSpec), [columnField, caseStatement])(ast => {
+    return ast;
+  });
 
 // ----------------------------------- Case -----------------------------------
 const caseStatement = () =>
-  chain('case', plus(caseAlternative), optional('else', [stringSym, 'null', numberSym]), 'end')();
+  chain('case', plus(caseAlternative), optional('else', [stringOrWordOrNumber, 'null']), [
+    'end',
+    chain('end', 'as', wordSym)()
+  ])();
 
 const caseAlternative = () => chain('when', expression, 'then', fieldItem)();
 
@@ -306,7 +331,7 @@ const expressionHead = () =>
 //  * | predicate
 // **/
 const booleanPrimary = () =>
-  chain(predicate, many(['isnull', chain(optional('is'), optional('not'), ['null', field])()]))();
+  chain(predicate, many(['isnull', chain([chain('is', 'not')(), 'is', 'not'], ['null', columnField])()]))(); // TODO:
 
 /*
  * predicate:
@@ -319,7 +344,17 @@ const booleanPrimary = () =>
  *  | field
  **/
 const predicate = () =>
-  chain(field, optional([chain(comparisonOperator, field)(), chain('sounds', 'like', field)(), isOrNotExpression]))();
+  chain(
+    columnField,
+    optional([chain(comparisonOperator, columnField)(), chain('sounds', 'like', columnField)(), isOrNotExpression])
+  )();
+
+const columnField = () =>
+  chain(field)(ast => ({
+    type: 'identifier',
+    variant: 'column',
+    name: ast[0]
+  }));
 
 const isOrNotExpression = () =>
   chain(optional('is'), optional('not'), [
@@ -330,6 +365,14 @@ const isOrNotExpression = () =>
   ])();
 
 const fieldItem = () =>
+  chain(fieldItemDetail, many(normalOperator, fieldItem))(ast => {
+    if (!ast[1]) {
+      return ast[0];
+    }
+    return [ast[0], ast[1]];
+  });
+
+const fieldItemDetail = () =>
   chain([
     functionChain,
     chain(
@@ -375,6 +418,8 @@ const stringOrWordOrNumber = () => chain([wordSym, stringSym, numberChain])(ast 
 const numberChain = () => chain(optional(['-', '+']), numberSym)();
 
 const logicalOperator = () => chain(['and', '&&', 'xor', 'or', '||'])(ast => ast[0]);
+
+const normalOperator = () => chain(['&&', '||'])(ast => ast[0]);
 
 const comparisonOperator = () => chain(['=', '>', '<', '<=', '>=', '<>', '!=', '<=>'])(ast => ast[0]);
 

@@ -1,8 +1,8 @@
 import * as _ from 'lodash';
 import { IToken } from '../lexer/token';
-import { ICompletionItem, IFrom, ISelectStatement, IStatement, IStatements, ITableInfo } from './define';
+import { ICompletionItem, IFrom, ISelectStatement, ISource, IStatement, IStatements, ITableInfo } from './define';
 
-type CursorType = 'tableField' | 'tableName' | 'namespace';
+type CursorType = 'tableField' | 'tableName' | 'namespace' | 'functionName';
 
 export type ICursorInfo<T = {}> = {
   token: IToken;
@@ -40,14 +40,20 @@ export async function getCursorInfo(rootStatement: IStatements, keyPath: string[
             tableInfo: parentStatement
           };
         }
-
       case 'identifier.column':
         if (cursorKey === 'name') {
           return {
             type: 'tableField',
             token: cursorValue
           };
+        } else {
+          return null;
         }
+      case 'function':
+        return {
+          type: 'functionName',
+          token: cursorValue
+        };
       default:
     }
   })) as ICursorInfo;
@@ -91,7 +97,7 @@ export async function getFieldsFromStatement(
   switch (statement.variant) {
     // Select statement
     case 'select':
-      return getFieldsByFromClauses(_.get(statement, 'from', []), cursorInfo, getFieldsByTableName);
+      return getFieldsByFromClauses(_.get(statement, 'from.sources', []), cursorInfo, getFieldsByTableName);
     default:
   }
 
@@ -117,20 +123,41 @@ async function getFieldsByFromClause(
   return judgeStatement(fromStatement, async typePlusVariant => {
     switch (typePlusVariant) {
       case 'identifier.table':
-        const itFromStatement = fromStatement as IFrom;
-        const originFields = await getFieldsByTableName(itFromStatement.name, cursorInfo.token.value);
-        originFields.forEach(originField => (originField.tableName = itFromStatement.name));
+        const itFromStatement = fromStatement as ISource;
+        let originFields = await getFieldsByTableName(itFromStatement.name, cursorInfo.token.value);
+        originFields = originFields.map(originField => {
+          return {
+            ...originField,
+            tableInfo: itFromStatement.name,
+            originFieldName: originField.label
+          };
+        });
         return originFields;
       case 'statement.select':
         const ssFromStatement = fromStatement as ISelectStatement;
-        const fields = await getFieldsByFromClauses(ssFromStatement.from, cursorInfo, getFieldsByTableName);
+        const fields = await getFieldsByFromClauses(ssFromStatement.from.sources, cursorInfo, getFieldsByTableName);
 
         // If select *, return all fields
         if (ssFromStatement.result.length === 1 && ssFromStatement.result[0].name.value === '*') {
           return fields;
         }
 
-        return fields.filter(field => ssFromStatement.result.find(result => result.name.value === field.label));
+        return fields
+          .map(field => {
+            const selectedField = ssFromStatement.result.find(result => result.name.value === field.label);
+            if (!selectedField) {
+              return null;
+            }
+
+            if (selectedField.alias) {
+              return {
+                ...field,
+                label: selectedField.alias.value
+              };
+            }
+            return field;
+          })
+          .filter(field => field !== null);
       default:
         return null;
     }
@@ -145,23 +172,26 @@ async function judgeStatement<T>(
     return null;
   }
 
-  return callback(statement.type + '.' + statement.variant);
+  if (statement.variant) {
+    return callback(statement.type + '.' + statement.variant);
+  } else {
+    return callback(statement.type);
+  }
 }
 
-export async function findTableName(
+export async function findFieldExtraInfo(
   rootStatement: IStatements,
   cursorInfo: ICursorInfo,
   getFieldsByTableName: IGetFieldsByTableName,
   fieldKeyPath: string[]
-): Promise<ITableInfo> {
+): Promise<ICompletionItem> {
   const fieldStatement = findNearestStatement(rootStatement, fieldKeyPath);
   const fields = await getFieldsFromStatement(fieldStatement, cursorInfo, getFieldsByTableName);
-
   const field = fields.find(eachField => eachField.label === cursorInfo.token.value);
 
   if (!field) {
     return null;
   }
 
-  return field.tableName;
+  return field;
 }

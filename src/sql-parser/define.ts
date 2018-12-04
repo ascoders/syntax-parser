@@ -8,7 +8,7 @@ export interface IStatement {
 }
 
 export interface ISelectStatement extends IStatement {
-  from: IFrom[];
+  from: IFrom;
   result: IResult[];
 }
 
@@ -18,6 +18,13 @@ export interface IResult extends IStatement {
 }
 
 export interface IFrom extends IStatement {
+  sources: ISource[];
+  where?: any;
+  group?: any;
+  having?: any;
+}
+
+export interface ISource extends IStatement {
   name: ITableInfo & IStatement;
   alias: IToken;
 }
@@ -31,5 +38,6 @@ export interface ICompletionItem {
   label: string;
   kind: string;
   sortText: string;
-  tableName?: ITableInfo;
+  tableInfo?: ITableInfo;
+  originFieldName?: string;
 }

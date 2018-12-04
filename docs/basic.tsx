@@ -5,38 +5,12 @@ import { chain, createLexer, createParser, many, sqlParser } from '../src';
 import { IMatching, IParseResult } from '../src/parser/define';
 import { ICompletionItem, ITableInfo } from '../src/sql-parser/define';
 import {
+  findFieldExtraInfo,
   findNearestStatement,
-  findTableName,
   getCursorInfo,
   getFieldsFromStatement,
   ICursorInfo
 } from '../src/sql-parser/reader';
-
-const myLexer = createLexer([
-  {
-    type: 'whitespace',
-    regexes: [/^(\s+)/],
-    ignore: true
-  },
-  {
-    type: 'word',
-    regexes: [/^([a-zA-Z0-9]+)/] // 解析数字
-  },
-  {
-    type: 'operator',
-    regexes: [
-      /^(\(|\))/, // 解析 ( )
-      /^(,)/
-    ]
-  }
-]);
-
-const root = () => chain('select', many('a'))();
-
-const myParser = createParser(
-  root, // Root grammar.
-  myLexer // Created in lexer example.
-);
 
 class Props {}
 
@@ -61,8 +35,6 @@ export default class Page extends React.PureComponent<Props, State> {
         height: 500
       });
 
-      editor.setValue(``);
-
       monacoSqlAutocomplete(monaco, editor, {
         onInputTableField: async tableName => {
           return Promise.resolve(
@@ -86,6 +58,15 @@ export default class Page extends React.PureComponent<Props, State> {
             }))
           );
         },
+        onInputFunctionName: async () => {
+          return Promise.resolve(
+            ['sum', 'count'].map(each => ({
+              label: each,
+              sortText: 'D' + each,
+              kind: monaco.languages.CompletionItemKind.Function
+            }))
+          );
+        },
         onHoverTableName: async cursorInfo => {
           return Promise.resolve([
             {
@@ -97,14 +78,21 @@ export default class Page extends React.PureComponent<Props, State> {
             }
           ]);
         },
-        onHoverTableField: (fieldName, tableName) => {
+        onHoverTableField: (fieldName, extra) => {
           return Promise.resolve([
             {
-              value: `你 hover 在 ${fieldName} 表名：${_.get(tableName, 'tableName.value', '')} 空间：${_.get(
-                tableName,
-                'namespace.value',
+              value: `你 hover 在 ${fieldName}，原始字段名：${_.get(extra, 'originFieldName')} 表名：${_.get(
+                extra,
+                'tableInfo.tableName.value',
                 ''
-              )}`
+              )} 空间：${_.get(extra, 'tableInfo.namespace.value', '')}`
+            }
+          ]);
+        },
+        onHoverFunctionName: functionName => {
+          return Promise.resolve([
+            {
+              value: `你 hover 在函数 ${functionName}`
             }
           ]);
         }
@@ -123,12 +111,14 @@ function monacoSqlAutocomplete(
   opts: {
     onInputTableField: (tableName?: ITableInfo, inputValue?: string) => Promise<any>;
     onInputTableName: (inputValue?: string) => Promise<any>;
+    onInputFunctionName: (inputValue?: string) => Promise<any>;
     onHoverTableName: (
       cursorInfo?: ICursorInfo<{
         tableInfo: ITableInfo;
       }>
     ) => Promise<any>;
-    onHoverTableField: (fieldName?: string, tableName?: ITableInfo) => Promise<any>;
+    onHoverTableField: (fieldName?: string, extra?: ICompletionItem) => Promise<any>;
+    onHoverFunctionName: (functionName?: string) => Promise<any>;
   }
 ) {
   // Get parser info and show error.
@@ -223,11 +213,13 @@ function monacoSqlAutocomplete(
             cursorInfo,
             opts.onInputTableField
           );
-
-          return cursorRootStatementFields.concat(parserSuggestion);
+          const functionNames = await opts.onInputFunctionName(cursorInfo.token.value);
+          return cursorRootStatementFields.concat(parserSuggestion).concat(functionNames);
         case 'tableName':
           const tableNames = await opts.onInputTableName(cursorInfo.token.value);
           return tableNames.concat(parserSuggestion);
+        case 'functionName':
+          return opts.onInputFunctionName(cursorInfo.token.value);
         default:
           return parserSuggestion;
       }
@@ -248,17 +240,20 @@ function monacoSqlAutocomplete(
 
       switch (cursorInfo.type) {
         case 'tableField':
-          const tableName = await findTableName(
+          const extra = await findFieldExtraInfo(
             parseResult.ast,
             cursorInfo,
             opts.onInputTableField,
             parseResult.cursorKeyPath
           );
-          contents = await opts.onHoverTableField(cursorInfo.token.value, tableName);
+          contents = await opts.onHoverTableField(cursorInfo.token.value, extra);
           break;
         case 'namespace':
         case 'tableName':
           contents = await opts.onHoverTableName(cursorInfo as ICursorInfo<{ tableInfo: ITableInfo }>);
+          break;
+        case 'functionName':
+          contents = await opts.onHoverFunctionName(cursorInfo.token.value);
           break;
         default:
       }
