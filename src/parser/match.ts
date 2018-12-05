@@ -21,7 +21,7 @@ function judgeMatch(source: string, target: string) {
   if (source === null) {
     return false;
   } else {
-    return source.toLowerCase() === target.toLowerCase();
+    return (source && source.toLowerCase()) === (target && target.toLowerCase());
   }
 }
 
