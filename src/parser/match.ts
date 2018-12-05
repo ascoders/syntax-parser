@@ -79,11 +79,11 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
     return matchToken(
       scanner,
       token => {
-        if (options.includes.some(includeValue => includeValue === token.value)) {
+        if (options.includes.some(includeValue => judgeMatch(includeValue, token.value))) {
           return true;
         }
 
-        if (options.excludes.some(includeValue => includeValue === token.value)) {
+        if (options.excludes.some(includeValue => judgeMatch(includeValue, token.value))) {
           return false;
         }
 
