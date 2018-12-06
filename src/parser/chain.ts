@@ -330,7 +330,6 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer) => (
     debugInfo: {
       tokens,
       callVisiterCount,
-      rootChainNode: parser.rootChainNode,
       costs: {
         lexer: lexerTime.getTime() - startTime.getTime(),
         parser: parserTime.getTime() - startTime.getTime()

@@ -17,7 +17,6 @@ export interface IParseResult {
   debugInfo: {
     tokens: IToken[];
     callVisiterCount: number;
-    rootChainNode: ChainNode;
     costs: {
       lexer: number;
       parser: number;
