@@ -140,3 +140,7 @@ export class MatchNode {
 
   public run = (scanner: Scanner, isCostToken = true) => this.matchFunction(scanner, isCostToken);
 }
+
+export class CreateParserOptions {
+  public cursorTokenExcludes?: (token?: IToken) => boolean = () => false;
+}

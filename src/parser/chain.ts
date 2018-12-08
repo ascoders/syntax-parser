@@ -6,6 +6,7 @@ import {
   ChainFunction,
   ChainNode,
   ChainNodeFactory,
+  CreateParserOptions,
   FirstOrFunctionSet,
   FunctionNode,
   IElement,
@@ -123,33 +124,45 @@ function getParser(root: ChainFunction) {
   }
 }
 
-function scannerAddCursorToken(scanner: Scanner, cursorIndex: number) {
+function scannerAddCursorToken(scanner: Scanner, cursorIndex: number, options?: CreateParserOptions) {
+  if (cursorIndex === null) {
+    return scanner;
+  }
+
   // Find where token cursorIndex is in.
   const cursorToken = scanner.getTokenByCharacterIndex(cursorIndex);
 
   // Generate cursor token, if cursor position is not in a token.
-  // Return cursor token.
-  if (!cursorToken && cursorIndex !== null) {
+  if (!cursorToken) {
     // If cursor not on token, add a match-all token.
     scanner.addToken({
       type: 'cursor',
       value: null,
       position: [cursorIndex, cursorIndex]
     });
+  } else if (options.cursorTokenExcludes(cursorToken)) {
+    // If cursor is exclude, add a token next!
+    scanner.addToken({
+      type: 'cursor',
+      value: null,
+      position: [cursorIndex + 1, cursorIndex + 1]
+    });
   }
 
   return scanner;
 }
 
-export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer) => (
+export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, options?: CreateParserOptions) => (
   text: string,
   cursorIndex: number = null
 ): IParseResult => {
+  options = defaults(options || {}, new CreateParserOptions());
+
   const startTime = new Date();
   const tokens = lexer(text);
   const lexerTime = new Date();
   const originScanner = new Scanner(tokens);
-  const scanner = scannerAddCursorToken(new Scanner(tokens), cursorIndex);
+  const scanner = scannerAddCursorToken(new Scanner(tokens), cursorIndex, options);
   const parser = getParser(root);
 
   const cursorPrevToken = scanner.getPrevTokenByCharacterIndex(cursorIndex).prevToken;
