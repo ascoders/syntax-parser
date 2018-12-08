@@ -125,8 +125,10 @@ function getParser(root: ChainFunction) {
 }
 
 function scannerAddCursorToken(scanner: Scanner, cursorIndex: number, options?: CreateParserOptions) {
+  let finalCursorIndex = cursorIndex;
+
   if (cursorIndex === null) {
-    return scanner;
+    return { scanner, finalCursorIndex };
   }
 
   // Find where token cursorIndex is in.
@@ -147,9 +149,10 @@ function scannerAddCursorToken(scanner: Scanner, cursorIndex: number, options?: 
       value: null,
       position: [cursorIndex + 1, cursorIndex + 1]
     });
+    finalCursorIndex += 1;
   }
 
-  return scanner;
+  return { scanner, finalCursorIndex };
 }
 
 export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, options?: CreateParserOptions) => (
@@ -162,7 +165,8 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
   const tokens = lexer(text);
   const lexerTime = new Date();
   const originScanner = new Scanner(tokens);
-  const scanner = scannerAddCursorToken(new Scanner(tokens), cursorIndex, options);
+  const { scanner, finalCursorIndex } = scannerAddCursorToken(new Scanner(tokens), cursorIndex, options);
+  cursorIndex = finalCursorIndex;
   const parser = getParser(root);
 
   const cursorPrevToken = scanner.getPrevTokenByCharacterIndex(cursorIndex).prevToken;
