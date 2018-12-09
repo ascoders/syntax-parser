@@ -100,25 +100,20 @@ const tokens = myLexer('a + b - (c+d)');
 ```typescript
 import { createParser, chain, matchTokenType, many } from 'syntax-parser';
 
-// Grammer root ::= ( addExpr )
-//                | addExpr
-const root = () => chain([chain('(', addExpr, ')')(ast => ast[1]), addExpr])(ast => ast[0]);
+const root = () => chain([subAddExpr, addExpr])(ast => ast[0]);
 
-// Grammer addExpr ::= word ( (+ | -) root )*
-const addExpr = () =>
-  chain(
-    matchTokenType('word'),
-    many(
-      chain(['+', '-'], root)(ast => ({
-        operator: ast[0].value,
-        term: ast[1]
-      }))
-    )
-  )(ast => ({
+const subAddExpr = () => chain('(', addExpr, ')')(ast => ast[1])
+
+const addExpr = () => chain(matchTokenType('word'), many(addPlus))(ast => ({
     left: ast[0].value,
     operator: ast[1] && ast[1][0][0].operator,
     right: ast[1] && ast[1][0][0].term
   }));
+
+const addPlus = () => chain(['+', '-'], root)(ast => ({
+  operator: ast[0].value,
+  term: ast[1]
+}))
 
 const myParser = createParser(
   root, // Root grammar.
@@ -205,17 +200,6 @@ const ast = myParser('a + b - (c+d)');
 //     }
 //   }
 // }]
-```
-
-## Built-in language
-
-### Sql parser
-
-`sqlParse` is a built-in case.
-
-```typescript
-import { sqlParser } from 'syntax-parser';
-sqlParser('select * from table;');
 ```
 
 ## Tests
