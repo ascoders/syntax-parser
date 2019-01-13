@@ -9,7 +9,7 @@
     "experimentalDecorators": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "./",
+    "rootDir": "./src",
     "baseUrl": ".",
     "lib": [
       "dom",
@@ -26,9 +26,7 @@
   },
   "include": [
     ".temp/**/*",
-    "src/**/*",
-    "tests/**/*",
-    "docs/**/*"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",

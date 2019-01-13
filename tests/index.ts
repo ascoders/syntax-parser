@@ -38,3 +38,5 @@ sqlGroups.forEach(sqlGroup => {
 //     });
 //   });
 // });
+
+test('', () => expect(true).toBe(true));
