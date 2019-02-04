@@ -81,13 +81,7 @@ export class Parser {
 
 export class VisiterStore {
   public restChances: IChance[] = [];
-  public nextMatchNodeFinders = new Set<{
-    node: ParentNode;
-    childIndex: number;
-  }>();
   public stop = false;
-  // TODO:
-  public cursorAst?: IAst = null;
 
   constructor(public scanner: Scanner, public parser: Parser) {}
 }
@@ -110,6 +104,9 @@ export class ChainNode {
 
   // Eg: const foo = chain => chain()(), so the chain creatorFunction is 'foo'.
   public creatorFunction: ChainFunction = null;
+
+  // Only user function can have functionName.
+  public functionName: string;
 
   public solveAst: ISolveAst = null;
 

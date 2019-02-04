@@ -3,7 +3,7 @@
   "version": "1.0.11",
   "pri": {
     "type": "component",
-    "version": "2.0.9"
+    "version": "2.0.11"
   },
   "scripts": {
     "start": "pri dev",
