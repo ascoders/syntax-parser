@@ -1,9 +1,8 @@
 {
   "name": "syntax-parser",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "pri": {
-    "type": "component",
-    "version": "2.0.21"
+    "type": "component"
   },
   "scripts": {
     "start": "pri dev",
@@ -26,5 +25,10 @@
   "peerDependencies": {},
   "dependencies": {
     "@babel/runtime": "^7.0.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm test"
+    }
   }
 }
