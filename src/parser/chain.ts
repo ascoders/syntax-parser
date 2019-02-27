@@ -69,18 +69,18 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
       return falseMatchNode;
     }
   } else if (typeof element === 'function') {
-    if (element.prototype.name === 'match') {
+    if (element.parserName === 'match') {
       const matchNode = new MatchNode(
         element(),
         {
           type: 'special',
-          value: element.prototype.displayName
+          value: element.displayName
         },
         parentIndex
       );
       matchNode.parentNode = parentNode;
       return matchNode;
-    } else if (element.prototype.name === 'chainNodeFactory') {
+    } else if (element.parserName === 'chainNodeFactory') {
       const chainNode = element(parentNode, null, parentIndex, parser);
       return chainNode;
     } else {
@@ -108,7 +108,7 @@ export const chain: Chain = (...elements) => (solveAst = args => args) => {
 
     return chainNode;
   };
-  chainNodeFactory.prototype.name = 'chainNodeFactory';
+  (chainNodeFactory as any).parserName = 'chainNodeFactory';
 
   return chainNodeFactory;
 };

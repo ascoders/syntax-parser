@@ -56,9 +56,9 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) =
       return (scanner: Scanner, isCostToken?: boolean) => fn(scanner, arg, isCostToken);
     }
 
-    foo.prototype.name = 'match';
+    foo.parserName = 'match';
 
-    foo.prototype.displayName = specialName;
+    foo.displayName = specialName;
     return foo;
   };
 }

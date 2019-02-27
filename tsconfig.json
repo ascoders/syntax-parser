@@ -9,7 +9,6 @@
     "experimentalDecorators": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "lib": [
       "dom",
