@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { chain, createLexer, createParser } from '../src';
+import { chain, createLexer, createParser, many, matchTokenType } from '../src';
 
 class Props {}
 
@@ -26,16 +26,24 @@ const myLexer = createLexer([
   },
   {
     type: 'operator',
-    regexes: [
-      /^(\(|\))/, // '(' ')'.
-      /^(\+|\-)/ // operators for + -.
-    ]
+    regexes: [/^(\+)/]
   }
 ]);
 
-const root = () => chain(a)();
+const root = () => chain(addExpr)(ast => ast[0]);
 
-const a = () => chain('a')();
+const addExpr = () =>
+  chain(matchTokenType('word'), many(addPlus))(ast => ({
+    left: ast[0].value,
+    operator: ast[1] && ast[1][0].operator,
+    right: ast[1] && ast[1][0].term
+  }));
+
+const addPlus = () =>
+  chain(['+', '-'], root)(ast => ({
+    operator: ast[0].value,
+    term: ast[1]
+  }));
 
 const myParser = createParser(
   root, // Root grammar.
@@ -43,4 +51,4 @@ const myParser = createParser(
 );
 
 // tslint:disable-next-line:no-console
-console.log(myParser('a'));
+console.log(myParser('a + b'));

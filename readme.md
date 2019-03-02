@@ -46,10 +46,7 @@ const myLexer = createLexer([
   },
   {
     type: 'operator',
-    regexes: [
-      /^(\(|\))/, // '(' ')'.
-      /^(\+|\-)/ // operators for + -.
-    ]
+    regexes: [/^(\+)/]
   }
 ]);
 ```
@@ -75,19 +72,13 @@ If you use a parser, instead of using lexer directly, pass it as a parameter to 
 This example tells you that lexer can be used alone(Though almost no, unless you have other uses.).
 
 ```typescript
-const tokens = myLexer('a + b - (c+d)');
+const tokens = myLexer('a + b');
 
 // tokens:
 // [
 //   { "type": "word", "value": "a", "position": [0, 1] },
 //   { "type": "operator", "value": "+", "position": [2, 3] },
-//   { "type": "word", "value": "b", "position": [4, 5] },
-//   { "type": "operator", "value": "-", "position": [6, 7] },
-//   { "type": "operator", "value": "(", "position": [8, 9] },
-//   { "type": "word", "value": "c", "position": [9, 10] },
-//   { "type": "operator", "value": "+", "position": [10, 11] },
-//   { "type": "word", "value": "d", "position": [11, 12] },
-//   { "type": "operator", "value": ")", "position": [12, 13] }
+//   { "type": "word", "value": "b", "position": [4, 5] }
 // ]
 ```
 
@@ -99,29 +90,21 @@ const tokens = myLexer('a + b - (c+d)');
 
 ```typescript
 import { createParser, chain, matchTokenType, many } from 'syntax-parser';
-import * as _ from 'lodash';
 
-const root = () => chain([subAddExpr, addExpr])(ast => ast[0]);
-
-const subAddExpr = () => chain('(', addExpr, ')')(ast => ast[1]);
+const root = () => chain(addExpr)(ast => ast[0]);
 
 const addExpr = () =>
   chain(matchTokenType('word'), many(addPlus))(ast => ({
     left: ast[0].value,
-    operator: _.get(ast, '1.0.operator'),
-    right: _.get(ast, '1.0.term')
+    operator: ast[1] && ast[1][0].operator,
+    right: ast[1] && ast[1][0].term
   }));
 
 const addPlus = () =>
   chain(['+', '-'], root)(ast => ({
-    operator: _.get(ast, '0.value'),
+    operator: ast[0].value,
     term: ast[1]
   }));
-
-const myParser = createParser(
-  root, // Root grammar.
-  myLexer // Created in lexer example.
-);
 ```
 
 **chain**
@@ -191,16 +174,8 @@ const ast = myParser('a + b - (c+d)');
 //   "operator": "+",
 //   "right": {
 //     "left": "b",
-//     "operator": "-",
-//     "right": {
-//       "left": "c",
-//       "operator": "+",
-//       "right": {
-//         "left": "d",
-//         "operator": null,
-//         "right": null
-//       }
-//     }
+//     "operator": null,
+//     "right": null
 //   }
 // }]
 ```
