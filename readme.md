@@ -105,6 +105,11 @@ const addPlus = () =>
     operator: ast[0].value,
     term: ast[1]
   }));
+
+const myParser = createParser(
+  root, // Root grammar.
+  myLexer // Created in lexer example.
+);
 ```
 
 **chain**
