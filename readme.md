@@ -101,7 +101,7 @@ const addExpr = () =>
   }));
 
 const addPlus = () =>
-  chain(['+', '-'], root)(ast => ({
+  chain('+', root)(ast => ({
     operator: ast[0].value,
     term: ast[1]
   }));
