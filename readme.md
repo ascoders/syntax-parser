@@ -171,7 +171,7 @@ chain('select', 'table')(
 ### Usage
 
 ```typescript
-const ast = myParser('a + b - (c+d)');
+const ast = myParser('a + b');
 
 // ast:
 // [{
