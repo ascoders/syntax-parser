@@ -49,6 +49,13 @@ const myLexer = createLexer([
     regexes: [/^(\+)/]
   }
 ]);
+
+myLexer('a + b');
+// [
+//   { "type": "word", "value": "a", "position": [0, 1] },
+//   { "type": "operator", "value": "+", "position": [2, 3] },
+//   { "type": "word", "value": "b", "position": [4, 5] }
+// ]
 ```
 
 **type**
@@ -65,28 +72,9 @@ The matching `Token` will not be added to the `Token` result queue.
 
 In general, whitespace can be ignored in syntax parsing.
 
-### Usage
-
-If you use a parser, instead of using lexer directly, pass it as a parameter to the parser.
-
-This example tells you that lexer can be used alone(Though almost no, unless you have other uses.).
-
-```typescript
-const tokens = myLexer('a + b');
-
-// tokens:
-// [
-//   { "type": "word", "value": "a", "position": [0, 1] },
-//   { "type": "operator", "value": "+", "position": [2, 3] },
-//   { "type": "word", "value": "b", "position": [4, 5] }
-// ]
-```
-
 ## Parser
 
 `createParser` can help you create a parser. Parser requires a lexer.
-
-### Example
 
 ```typescript
 import { createParser, chain, matchTokenType, many } from 'syntax-parser';
@@ -110,13 +98,25 @@ const myParser = createParser(
   root, // Root grammar.
   myLexer // Created in lexer example.
 );
+
+myParser('a + b');
+// ast:
+// [{
+//   "left": "a",
+//   "operator": "+",
+//   "right": {
+//     "left": "b",
+//     "operator": null,
+//     "right": null
+//   }
+// }]
 ```
 
-**chain**
+### chain
 
 Basic grammatical element, support four parameters:
 
-_string_
+#### string
 
 String means match token:
 
@@ -124,7 +124,7 @@ String means match token:
 chain('select', 'table'); // Match 'select table'
 ```
 
-_array_
+#### array
 
 Array means 'or':
 
@@ -132,7 +132,7 @@ Array means 'or':
 chain('select', ['table', 'chart']); // Match both 'select table' and 'select chart'
 ```
 
-_matchTokenType_
+#### matchTokenType
 
 `matchTokenType` allow you match `Token` type defined in lexer.
 
@@ -140,7 +140,7 @@ _matchTokenType_
 chain('select', matchTokenType('word')); // Match 'select [any word!]'
 ```
 
-_function_
+#### function
 
 It's easy to call another chain function:
 
@@ -149,7 +149,7 @@ const a = () => chain('select', b);
 const b = () => chain('table');
 ```
 
-_many/optional_
+### many/optional
 
 Just as literal meaning:
 
@@ -166,23 +166,6 @@ The last callback allow partial redefin of local ast:
 chain('select', 'table')(
   ast => ast[0] // return 'select'
 );
-```
-
-### Usage
-
-```typescript
-const ast = myParser('a + b');
-
-// ast:
-// [{
-//   "left": "a",
-//   "operator": "+",
-//   "right": {
-//     "left": "b",
-//     "operator": null,
-//     "right": null
-//   }
-// }]
 ```
 
 ## Tests
