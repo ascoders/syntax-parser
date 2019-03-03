@@ -12,13 +12,13 @@
     "analyse": "pri analyse",
     "test": "pri test",
     "format": "tslint --fix './src/**/*.?(ts|tsx)' && prettier --write './src/**/*.?(ts|tsx)'",
-    "prepublishOnly": "npm run build && npm run bundle",
+    "prepublishOnly": "npm run build && npm run bundle --skipLint",
     "bundle": "pri bundle",
     "release": "npm publish",
     "posttest": "codecov -f coverage/*.json -t dc6610f3-32ac-4d30-8676-74d3888349a0"
   },
   "devDependencies": {
-    "pri": "^2.0.49"
+    "pri": "^2.0.59"
   },
   "main": "dist/index.js",
   "types": "src/index.tsx",
