@@ -18,7 +18,7 @@
     "posttest": "codecov -f coverage/*.json -t dc6610f3-32ac-4d30-8676-74d3888349a0"
   },
   "devDependencies": {
-    "pri": "^2.0.59"
+    "pri": "^2.0.60"
   },
   "main": "dist/index.js",
   "types": "src/index.tsx",
