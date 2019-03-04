@@ -20,7 +20,7 @@
     </p>
 </p>
 
-It supports:
+[syntax-parser](https://www.npmjs.com/package/syntax-parser) supports:
 
 - lexer.
 - parser.
