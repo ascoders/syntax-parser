@@ -43,18 +43,18 @@ export default class Page extends React.PureComponent<Props, State> {
 
 function loadMonacoEditor() {
   return new Promise(resolve => {
-    loadJs('https://unpkg.alipay.com/monaco-editor/min/vs/loader.js', () => {
+    loadJs('https://unpkg.com/monaco-editor/min/vs/loader.js', () => {
       const { require } = window as any;
 
-      require.config({ paths: { vs: 'https://unpkg.alipay.com/monaco-editor/min/vs' } });
+      require.config({ paths: { vs: 'https://unpkg.com/monaco-editor/min/vs' } });
 
       (window as any).MonacoEnvironment = {
         getWorkerUrl: () => {
           return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
           self.MonacoEnvironment = {
-            baseUrl: 'https://unpkg.alipay.com/monaco-editor/min/'
+            baseUrl: 'https://unpkg.com/monaco-editor/min/'
           };
-          importScripts('https://unpkg.alipay.com/monaco-editor/min/vs/base/worker/workerMain.js');`)}`;
+          importScripts('https://unpkg.com/monaco-editor/min/vs/base/worker/workerMain.js');`)}`;
         }
       };
 

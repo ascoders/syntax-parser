@@ -173,3 +173,15 @@ chain('select', 'table')(
 ```bash
 npm test
 ```
+
+## Monaco Editor Sql Editor
+
+<img width=600 src="https://img.alicdn.com/tfs/TB1hGD0dMaH3KVjSZFjXXcFWpXa-1143-649.gif">
+
+If you want to see this demo, run this command:
+
+```bash
+npm run docs
+```
+
+Then select demo `Monaco Editor`.
