@@ -67,37 +67,51 @@ export interface IChance {
   tokenIndex: number;
 }
 
-//////////////////////////////////////// Const or Variables
+// ////////////////////////////////////// Const or Variables
 
 export const parserMap = new Map<ChainFunction, Parser>();
 export const MAX_VISITER_CALL = 1000000;
 
 export class Parser {
   public rootChainNode: ChainNode = null;
+
   public firstSet = new Map<ChainFunction, MatchNode[]>();
+
   public firstOrFunctionSet = new Map<ChainFunction, FirstOrFunctionSet[]>();
+
   public relatedSet = new Map<ChainFunction, Set<ChainFunction>>();
 }
 
 export class VisiterStore {
   public restChances: IChance[] = [];
+
   public stop = false;
 
-  constructor(public scanner: Scanner, public parser: Parser) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(public scanner: Scanner, public parser: Parser) {
+    //
+  }
 }
 
 export class VisiterOption {
   public onCallVisiter?: (node?: Node, store?: VisiterStore) => void;
+
   public onVisiterNextNode?: (node?: Node, store?: VisiterStore) => void;
+
   public onSuccess?: () => void;
+
   public onFail?: (lastNode?: Node) => void;
+
   public onMatchNode: (matchNode: MatchNode, store: VisiterStore, visiterOption: VisiterOption) => void;
+
   public generateAst?: boolean = true;
+
   public enableFirstSet?: boolean = true;
 }
 
 export class ChainNode {
   public parentNode: ParentNode;
+
   public childs: Node[] = [];
 
   public astResults?: IAst[] = [];
@@ -110,20 +124,30 @@ export class ChainNode {
 
   public solveAst: ISolveAst = null;
 
-  constructor(public parentIndex: number) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(public parentIndex: number) {
+    //
+  }
 }
 
 export class TreeNode {
   public parentNode: ParentNode;
+
   public childs: Node[] = [];
 
-  constructor(public parentIndex: number) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(public parentIndex: number) {
+    //
+  }
 }
 
 export class FunctionNode {
   public parentNode: ParentNode;
 
-  constructor(public chainFunction: ChainFunction, public parentIndex: number, public parser: Parser) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(public chainFunction: ChainFunction, public parentIndex: number, public parser: Parser) {
+    //
+  }
 
   public run = () => {
     return this.chainFunction()(this.parentNode, this.chainFunction, this.parentIndex, this.parser);
@@ -133,11 +157,18 @@ export class FunctionNode {
 export class MatchNode {
   public parentNode: ParentNode;
 
-  constructor(private matchFunction: IMatchFn, public matching: IMatching, public parentIndex: number) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(private matchFunction: IMatchFn, public matching: IMatching, public parentIndex: number) {
+    //
+  }
 
-  public run = (scanner: Scanner, isCostToken = true) => this.matchFunction(scanner, isCostToken);
+  public run = (scanner: Scanner, isCostToken = true) => {
+    return this.matchFunction(scanner, isCostToken);
+  };
 }
 
 export class CreateParserOptions {
-  public cursorTokenExcludes?: (token?: IToken) => boolean = () => false;
+  public cursorTokenExcludes?: (token?: IToken) => boolean = () => {
+    return false;
+  };
 }

@@ -1,13 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { mysqlParser } from '../src/demo/sql-parser';
 
-const sqlTests: Array<{
+const sqlTests: {
   groupName: string;
-  childs: Array<{
+  childs: {
     name: string;
     content: string;
-  }>;
-}> = [];
+  }[];
+}[] = [];
 
 const sqlGroups = fs.readdirSync(path.join(__dirname, './sqls'));
 
@@ -30,13 +31,15 @@ sqlGroups.forEach(sqlGroup => {
   });
 });
 
-// sqlTests.forEach(sqlTest => {
-//   sqlTest.childs.forEach(eachTest => {
-//     test(`${sqlTest.groupName}.${eachTest.name}`, () => {
-//       const result = sqlParser(eachTest.content);
-//       expect(result.success).toBe(true);
-//     });
-//   });
-// });
+sqlTests.forEach(sqlTest => {
+  sqlTest.childs.forEach(eachTest => {
+    test(`${sqlTest.groupName}.${eachTest.name}`, () => {
+      const result = mysqlParser(eachTest.content);
+      expect(result.success).toBe(true);
+    });
+  });
+});
 
-test('', () => expect(true).toBe(true));
+test('', () => {
+  return expect(true).toBe(true);
+});

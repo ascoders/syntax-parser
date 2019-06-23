@@ -12,7 +12,10 @@ interface ILexerConfig {
 }
 
 class Tokenizer {
-  constructor(public lexerConfig: ILexerConfig[]) {}
+  // eslint-disable-next-line no-useless-constructor, @typescript-eslint/no-parameter-properties
+  constructor(public lexerConfig: ILexerConfig[]) {
+    //
+  }
 
   public tokenize(input: string) {
     const tokens = [];
@@ -28,6 +31,7 @@ class Tokenizer {
         throw Error(`Lexer: Unexpected string "${input}".`);
       }
 
+      // eslint-disable-next-line prefer-destructuring
       token = result.token;
 
       if (!token.value) {
@@ -38,6 +42,7 @@ class Tokenizer {
       lastPosition += token.value.length;
 
       // Advance the string
+      // eslint-disable-next-line no-param-reassign
       input = input.substring(token.value.length);
 
       if (!result.config.ignore) {
@@ -67,6 +72,7 @@ class Tokenizer {
     const matches = input.match(regex);
 
     if (matches) {
+      // eslint-disable-next-line @typescript-eslint/no-object-literal-type-assertion
       return { type, value: matches[1] } as IToken;
     }
   }
@@ -74,5 +80,8 @@ class Tokenizer {
 
 export type Lexer = (text: string) => IToken[];
 
-export const createLexer = (lexerConfig: ILexerConfig[]): Lexer => (text: string) =>
-  new Tokenizer(lexerConfig).tokenize(text);
+export const createLexer = (lexerConfig: ILexerConfig[]): Lexer => {
+  return (text: string) => {
+    return new Tokenizer(lexerConfig).tokenize(text);
+  };
+};

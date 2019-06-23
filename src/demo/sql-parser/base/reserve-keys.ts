@@ -13,5 +13,11 @@ export const reserveKeys = [
   'in',
   'between',
   'regexp',
-  'isnull'
+  'isnull',
+  'lateral',
+  'left',
+  'right',
+  'inner',
+  'outer',
+  'join'
 ];

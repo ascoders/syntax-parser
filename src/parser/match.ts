@@ -1,4 +1,3 @@
-import * as _ from 'lodash';
 import { IToken } from '../lexer/token';
 import { chain } from './chain';
 import { IElements } from './define';
@@ -12,17 +11,17 @@ export interface IMatch {
 function equalWordOrIncludeWords(str: string, word: string | string[] | null) {
   if (typeof word === 'string') {
     return judgeMatch(str, word);
-  } else {
-    return word.some(eachWord => judgeMatch(str, eachWord));
   }
+  return word.some(eachWord => {
+    return judgeMatch(str, eachWord);
+  });
 }
 
 function judgeMatch(source: string, target: string) {
   if (source === null) {
     return false;
-  } else {
-    return (source && source.toLowerCase()) === (target && target.toLowerCase());
   }
+  return (source && source.toLowerCase()) === (target && target.toLowerCase());
 }
 
 function matchToken(scanner: Scanner, compare: (token: IToken) => boolean, isCostToken?: boolean): IMatch {
@@ -42,18 +41,19 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean, isCos
       token,
       match: true
     };
-  } else {
-    return {
-      token,
-      match: false
-    };
   }
+  return {
+    token,
+    match: false
+  };
 }
 
 function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) => IMatch, specialName?: string) {
   return (arg?: T) => {
     function foo() {
-      return (scanner: Scanner, isCostToken?: boolean) => fn(scanner, arg, isCostToken);
+      return (scanner: Scanner, isCostToken?: boolean) => {
+        return fn(scanner, arg, isCostToken);
+      };
     }
 
     foo.parserName = 'match';
@@ -63,9 +63,15 @@ function createMatch<T>(fn: (scanner: Scanner, arg?: T, isCostToken?: boolean) =
   };
 }
 
-export const match = createMatch((scanner, word: string | string[], isCostToken) =>
-  matchToken(scanner, token => equalWordOrIncludeWords(token.value, word), isCostToken)
-);
+export const match = createMatch((scanner, word: string | string[], isCostToken) => {
+  return matchToken(
+    scanner,
+    token => {
+      return equalWordOrIncludeWords(token.value, word);
+    },
+    isCostToken
+  );
+});
 
 interface IMatchTokenTypeOption {
   includes?: string[];
@@ -79,11 +85,19 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
     return matchToken(
       scanner,
       token => {
-        if (options.includes.some(includeValue => judgeMatch(includeValue, token.value))) {
+        if (
+          options.includes.some(includeValue => {
+            return judgeMatch(includeValue, token.value);
+          })
+        ) {
           return true;
         }
 
-        if (options.excludes.some(includeValue => judgeMatch(includeValue, token.value))) {
+        if (
+          options.excludes.some(includeValue => {
+            return judgeMatch(includeValue, token.value);
+          })
+        ) {
           return false;
         }
 
@@ -98,22 +112,33 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
   }, tokenType)();
 };
 
-export const matchTrue = (): IMatch => ({
-  token: null,
-  match: true
-});
+export const matchTrue = (): IMatch => {
+  return {
+    token: null,
+    match: true
+  };
+};
 
-export const matchFalse = (): IMatch => ({
-  token: null,
-  match: true
-});
+export const matchFalse = (): IMatch => {
+  return {
+    token: null,
+    match: true
+  };
+};
 
 export const optional = (...elements: IElements) => {
   if (elements.length === 0) {
     throw Error('Must have arguments!');
   }
 
-  return chain([chain(...elements)(ast => (elements.length === 1 ? ast[0] : ast)), true])(ast => ast[0]);
+  return chain([
+    chain(...elements)(ast => {
+      return elements.length === 1 ? ast[0] : ast;
+    }),
+    true
+  ])(ast => {
+    return ast[0];
+  });
 };
 
 export const plus = (...elements: IElements) => {
@@ -121,14 +146,19 @@ export const plus = (...elements: IElements) => {
     throw Error('Must have arguments!');
   }
 
-  const plusFunction = () =>
-    chain(chain(...elements)(ast => (elements.length === 1 ? ast[0] : ast)), optional(plusFunction))(ast => {
+  const plusFunction = () => {
+    return chain(
+      chain(...elements)(ast => {
+        return elements.length === 1 ? ast[0] : ast;
+      }),
+      optional(plusFunction)
+    )(ast => {
       if (ast[1]) {
         return [ast[0]].concat(ast[1]);
-      } else {
-        return [ast[0]];
       }
+      return [ast[0]];
     });
+  };
   return plusFunction;
 };
 

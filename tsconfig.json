@@ -14,12 +14,16 @@
       "dom",
       "es5",
       "es6",
-      "scripthost"
+      "scripthost",
+      "es2018.promise"
     ],
     "paths": {
       "pri/*": [
         "pri",
         ".temp/types/*"
+      ],
+      "src/*": [
+        "src/*"
       ]
     }
   },

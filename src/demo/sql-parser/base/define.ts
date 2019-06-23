@@ -1,4 +1,4 @@
-import { IToken } from '../lexer/token';
+import { IToken } from '../../..';
 
 export type IStatements = IStatement[];
 
@@ -36,8 +36,30 @@ export interface ITableInfo {
 
 export interface ICompletionItem {
   label: string;
-  kind: string;
-  sortText: string;
+  kind?: string;
+  sortText?: string;
   tableInfo?: ITableInfo;
+  groupPickerName?: string;
   originFieldName?: string;
+  detail?: string;
+  documentation?: string;
 }
+
+export type CursorType =
+  | 'tableField'
+  | 'tableName'
+  | 'namespace'
+  | 'namespaceOne'
+  | 'functionName'
+  | 'tableFieldAfterGroup';
+
+export type ICursorInfo<T = {}> = {
+  token: IToken;
+  type: CursorType;
+} & T;
+
+export type IGetFieldsByTableName = (
+  tableName: ITableInfo,
+  inputValue: string,
+  rootStatement: IStatement
+) => Promise<ICompletionItem[]>;

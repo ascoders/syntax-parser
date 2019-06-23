@@ -2,6 +2,7 @@ import { IToken } from '../lexer/token';
 
 export class Scanner {
   private tokens: IToken[] = [];
+
   private index = 0;
 
   constructor(tokens: IToken[], index = 0) {
@@ -14,36 +15,42 @@ export class Scanner {
     const token = this.tokens[this.index];
     if (token) {
       return token;
-    } else {
-      return false;
     }
+    return false;
   };
 
   public next = () => {
-    this.index++;
+    this.index += 1;
   };
 
   public isEnd = () => {
     return this.index >= this.tokens.length;
   };
 
-  public getIndex = () => this.index;
+  public getIndex = () => {
+    return this.index;
+  };
 
-  public setIndex = (index: number) => (this.index = index);
+  public setIndex = (index: number) => {
+    this.index = index;
+    return index;
+  };
 
-  public getRestTokenCount = () => this.tokens.length - this.index - 1;
+  public getRestTokenCount = () => {
+    return this.tokens.length - this.index - 1;
+  };
 
   public getNextByToken = (token: IToken) => {
-    const currentTokenIndex = this.tokens.findIndex(eachToken => eachToken === token);
+    const currentTokenIndex = this.tokens.findIndex(eachToken => {
+      return eachToken === token;
+    });
     if (currentTokenIndex > -1) {
       if (currentTokenIndex + 1 < this.tokens.length) {
         return this.tokens[currentTokenIndex + 1];
-      } else {
-        return null;
       }
-    } else {
-      throw Error(`token ${token.value.toString()} not exist in scanner.`);
+      return null;
     }
+    throw Error(`token ${token.value.toString()} not exist in scanner.`);
   };
 
   public getTokenByCharacterIndex = (characterIndex: number) => {

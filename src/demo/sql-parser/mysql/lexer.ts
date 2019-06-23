@@ -1,4 +1,4 @@
-import { createLexer } from '../lexer';
+import { createLexer } from '../../..';
 
 export const sqlTokenizer = createLexer([
   {
@@ -21,8 +21,8 @@ export const sqlTokenizer = createLexer([
   {
     type: 'word',
     regexes: [
-      /^([a-zA-Z0-9_\u4e00-\u9fa5]+)/, // word
-      /^(\$\{[a-zA-Z0-9_\u4e00-\u9fa5]+\})/ // ${word}
+      /^([a-zA-Z0-9_]+)/, // word
+      /^(\$\{[a-zA-Z0-9_]+\})/ // ${word}
     ]
   },
   {
