@@ -19,5 +19,5 @@ export const reserveKeys = [
   'right',
   'inner',
   'outer',
-  'join'
+  'join',
 ];

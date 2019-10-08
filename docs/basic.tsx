@@ -20,16 +20,16 @@ const myLexer = createLexer([
   {
     type: 'whitespace',
     regexes: [/^(\s+)/],
-    ignore: true
+    ignore: true,
   },
   {
     type: 'word',
-    regexes: [/^([a-zA-Z0-9]+)/]
+    regexes: [/^([a-zA-Z0-9]+)/],
   },
   {
     type: 'operator',
-    regexes: [/^(\+)/]
-  }
+    regexes: [/^(\+)/],
+  },
 ]);
 
 const root = () => {
@@ -43,7 +43,7 @@ const addExpr = () => {
     return {
       left: ast[0].value,
       operator: ast[1] && ast[1][0].operator,
-      right: ast[1] && ast[1][0].term
+      right: ast[1] && ast[1][0].term,
     };
   });
 };
@@ -52,14 +52,14 @@ const addPlus = () => {
   return chain(['+', '-'], root)(ast => {
     return {
       operator: ast[0].value,
-      term: ast[1]
+      term: ast[1],
     };
   });
 };
 
 const myParser = createParser(
   root, // Root grammar.
-  myLexer // Created in lexer example.
+  myLexer, // Created in lexer example.
 );
 
 // eslint-disable-next-line no-console

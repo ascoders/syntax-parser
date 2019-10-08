@@ -23,7 +23,7 @@ export default class Page extends React.PureComponent<Props, State> {
       // eslint-disable-next-line react/no-find-dom-node
       const editor = monaco.editor.create(ReactDOM.findDOMNode(this.root), {
         value: [''].join('\n'),
-        language: 'sql'
+        language: 'sql',
       });
       monacoSqlAutocomplete(monaco, editor);
     });
@@ -55,7 +55,7 @@ function loadMonacoEditor() {
             baseUrl: 'https://unpkg.com/monaco-editor/min/'
           };
           importScripts('https://unpkg.com/monaco-editor/min/vs/base/worker/workerMain.js');`)}`;
-        }
+        },
       };
 
       // eslint-disable-next-line import/no-dynamic-require

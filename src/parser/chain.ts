@@ -20,7 +20,7 @@ import {
   parserMap,
   TreeNode,
   VisiterOption,
-  VisiterStore
+  VisiterStore,
 } from './define';
 import { match, matchFalse, matchTrue } from './match';
 import { Scanner } from './scanner';
@@ -40,9 +40,9 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
       match(element)(),
       {
         type: 'string',
-        value: element
+        value: element,
       },
-      parentIndex
+      parentIndex,
     );
     matchNode.parentNode = parentNode;
     return matchNode;
@@ -53,9 +53,9 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
         matchTrue,
         {
           type: 'loose',
-          value: true
+          value: true,
         },
-        parentIndex
+        parentIndex,
       );
       trueMatchNode.parentNode = parentNode;
       return trueMatchNode;
@@ -64,9 +64,9 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
       matchFalse,
       {
         type: 'loose',
-        value: false
+        value: false,
       },
-      parentIndex
+      parentIndex,
     );
     falseMatchNode.parentNode = parentNode;
     return falseMatchNode;
@@ -77,9 +77,9 @@ const createNodeByElement = (element: IElement, parentNode: ParentNode, parentIn
         element(),
         {
           type: 'special',
-          value: element.displayName
+          value: element.displayName,
         },
-        parentIndex
+        parentIndex,
       );
       matchNode.parentNode = parentNode;
       return matchNode;
@@ -99,7 +99,7 @@ export const chain: Chain = (...elements) => {
   return (
     solveAst = args => {
       return args;
-    }
+    },
   ) => {
     const chainNodeFactory: ChainNodeFactory = (parentNode, creatorFunction, parentIndex = 0, parser) => {
       const chainNode = new ChainNode(parentIndex);
@@ -149,14 +149,14 @@ function scannerAddCursorToken(scanner: Scanner, cursorIndex: number, options?: 
     scanner.addToken({
       type: 'cursor',
       value: null,
-      position: [cursorIndex, cursorIndex]
+      position: [cursorIndex, cursorIndex],
     });
   } else if (options.cursorTokenExcludes(cursorToken)) {
     // If cursor is exclude, add a token next!
     scanner.addToken({
       type: 'cursor',
       value: null,
-      position: [cursorIndex + 1, cursorIndex + 1]
+      position: [cursorIndex + 1, cursorIndex + 1],
     });
     finalCursorIndex += 1;
   }
@@ -228,13 +228,13 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
               lastMatchUnderShortestRestToken = {
                 matchNode,
                 token: matchResult.token,
-                restTokenCount
+                restTokenCount,
               };
             }
 
             visitNextNodeFromParent(matchNode, store, currentVisiterOption, {
               token: true,
-              ...matchResult.token
+              ...matchResult.token,
             });
           }
         },
@@ -243,9 +243,9 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
         },
         onFail: node => {
           success = false;
-        }
+        },
       },
-      parser
+      parser,
     });
 
     // Parse with curosr token
@@ -286,12 +286,12 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
 
             visitNextNodeFromParent(matchNode, store, currentVisiterOption, {
               token: true,
-              ...matchResult.token
+              ...matchResult.token,
             });
           }
-        }
+        },
       },
-      parser
+      parser,
     });
 
     cursorPrevNodes = uniq(cursorPrevNodes);
@@ -301,7 +301,7 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
       (all, cursorPrevNode) => {
         return all.concat(findNextMatchNodes(cursorPrevNode, parser));
       },
-      [] as MatchNode[]
+      [] as MatchNode[],
     );
 
     nextMatchNodes = uniqBy(nextMatchNodes, each => {
@@ -329,7 +329,7 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
         }),
         each => {
           return each.type + each.value;
-        }
+        },
       );
 
       const errorToken =
@@ -339,13 +339,13 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
         error = {
           suggestions,
           token: errorToken,
-          reason: 'wrong'
+          reason: 'wrong',
         };
       } else {
         error = {
           suggestions,
           token: lastMatchUnderShortestRestToken ? lastMatchUnderShortestRestToken.token : null,
-          reason: 'incomplete'
+          reason: 'incomplete',
         };
       }
     }
@@ -373,9 +373,9 @@ export const createParser = <AST = {}>(root: ChainFunction, lexer: Lexer, option
         callVisiterCount,
         costs: {
           lexer: lexerTime.getTime() - startTime.getTime(),
-          parser: parserTime.getTime() - startTime.getTime()
-        }
-      }
+          parser: parserTime.getTime() - startTime.getTime(),
+        },
+      },
     };
   };
 };
@@ -384,7 +384,7 @@ function newVisit({
   node,
   scanner,
   visiterOption,
-  parser
+  parser,
 }: {
   node: Node;
   scanner: Scanner;
@@ -403,7 +403,7 @@ const visit = tailCallOptimize(
     node,
     store,
     visiterOption,
-    childIndex
+    childIndex,
   }: {
     node: Node;
     store: VisiterStore;
@@ -452,14 +452,14 @@ const visit = tailCallOptimize(
     } else {
       throw Error(`Unexpected node type: ${node}`);
     }
-  }
+  },
 );
 
 function visitChildNode({
   node,
   store,
   visiterOption,
-  childIndex
+  childIndex,
 }: {
   node: ParentNode;
   store: VisiterStore;
@@ -475,7 +475,7 @@ function visitChildNode({
         node,
         store,
         visiterOption,
-        visiterOption.generateAst ? node.solveAst(node.astResults) : null
+        visiterOption.generateAst ? node.solveAst(node.astResults) : null,
       );
     }
   } else {
@@ -488,7 +488,7 @@ function visitChildNode({
         visiterOption,
         tokenIndex: store.scanner.getIndex(),
         childIndex: childIndex + 1,
-        addToNextMatchNodeFinders: true
+        addToNextMatchNodeFinders: true,
       });
     }
     if (child) {
@@ -528,7 +528,7 @@ const visitNextNodeFromParent = tailCallOptimize(
     } else {
       throw Error(`Unexpected parent node type: ${node.parentNode}`);
     }
-  }
+  },
 );
 
 function noNextNode(node: Node, store: VisiterStore, visiterOption: VisiterOption) {
@@ -547,7 +547,7 @@ function addChances({
   visiterOption,
   tokenIndex,
   childIndex,
-  addToNextMatchNodeFinders
+  addToNextMatchNodeFinders,
 }: {
   node: ParentNode;
   store: VisiterStore;
@@ -559,7 +559,7 @@ function addChances({
   const chance = {
     node,
     tokenIndex,
-    childIndex
+    childIndex,
   };
 
   store.restChances.push(chance);
@@ -616,7 +616,7 @@ function findNextMatchNodes(node: Node, parser: Parser): MatchNode[] {
 
       // Suppose the match failed, so we can find another possible match chance!
       tryChances(matchNode, store, currentVisiterOption);
-    }
+    },
   };
 
   newVisit({ node, scanner: new Scanner([]), visiterOption, parser });
@@ -706,7 +706,7 @@ function solveFirstSet(creatorFunction: ChainFunction, parser: Parser) {
 
       return all;
     },
-    [] as FirstOrFunctionSet[]
+    [] as FirstOrFunctionSet[],
   );
 
   parser.firstOrFunctionSet.set(creatorFunction, newFirstMatchNodes);

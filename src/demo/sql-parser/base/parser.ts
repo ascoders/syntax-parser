@@ -31,8 +31,8 @@ export const dataType = () => {
     chain('geometrycollection', 'linestring', 'multilinestring', 'multipoint', 'multipolygon', 'point', 'polygon')(
       ast => {
         return ast[0];
-      }
-    )
+      },
+    ),
   ])(ast => {
     return ast[0];
   });
@@ -118,7 +118,7 @@ export const selectSpec = () => {
     'sql_buffer_result',
     'sql_cache',
     'sql_no_cache',
-    'sql_calc_found_rows'
+    'sql_calc_found_rows',
   ])(ast => {
     return ast[0];
   });

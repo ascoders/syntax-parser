@@ -1,3 +1,4 @@
 {
-  "type": "component"
+  "type": "component",
+  "packageLock": true
 }

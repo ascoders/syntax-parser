@@ -40,7 +40,7 @@ export function createFourOperations(field: ChainFunction) {
       chain('(', addExpr, ')')(ast => {
         return ast[1];
       }),
-      field
+      field,
     ])(ast => {
       return ast[0];
     });

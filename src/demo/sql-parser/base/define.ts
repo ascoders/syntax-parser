@@ -61,5 +61,5 @@ export type ICursorInfo<T = {}> = {
 export type IGetFieldsByTableName = (
   tableName: ITableInfo,
   inputValue: string,
-  rootStatement: IStatement
+  rootStatement: IStatement,
 ) => Promise<ICompletionItem[]>;

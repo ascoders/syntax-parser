@@ -18,7 +18,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
     throw Error(
       `monaco-editor version ${
         opts.monacoEditorVersion
-      } is not allowed, only support ${supportedMonacoEditorVersion.join(' ')}`
+      } is not allowed, only support ${supportedMonacoEditorVersion.join(' ')}`,
     );
   }
 
@@ -62,13 +62,13 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
                   startLineNumber: model.getPositionAt(parseResult.error.token.position[0]).lineNumber,
                   startColumn: model.getPositionAt(parseResult.error.token.position[0]).column,
                   endLineNumber: model.getPositionAt(parseResult.error.token.position[1]).lineNumber,
-                  endColumn: model.getPositionAt(parseResult.error.token.position[1]).column + 1
+                  endColumn: model.getPositionAt(parseResult.error.token.position[1]).column + 1,
                 }
               : {
                   startLineNumber: 0,
                   startColumn: 0,
                   endLineNumber: 0,
-                  endColumn: 0
+                  endColumn: 0,
                 };
 
             model.getPositionAt(parseResult.error.token);
@@ -77,8 +77,8 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
               {
                 ...errorPosition,
                 message: newReason,
-                severity: getSeverityByVersion(monaco, opts.monacoEditorVersion)
-              }
+                severity: getSeverityByVersion(monaco, opts.monacoEditorVersion),
+              },
             ]);
           } else {
             monaco.editor.setModelMarkers(editor.getModel(), opts.language, []);
@@ -111,7 +111,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
           const cursorRootStatementFields = await reader.getFieldsFromStatement(
             parseResult.ast,
             parseResult.cursorKeyPath,
-            opts.onSuggestTableFields
+            opts.onSuggestTableFields,
           );
 
           // group.fieldName
@@ -119,7 +119,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
             cursorRootStatementFields.filter(cursorRootStatementField => {
               return cursorRootStatementField.groupPickerName !== null;
             }),
-            'groupPickerName'
+            'groupPickerName',
           );
 
           const functionNames = await opts.onSuggestFunctionName(cursorInfo.token.value);
@@ -133,16 +133,16 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
                   ? Object.keys(groups).map(groupName => {
                       return opts.onSuggestFieldGroup(groupName);
                     })
-                  : []
+                  : [],
               ),
-            opts.monacoEditorVersion
+            opts.monacoEditorVersion,
           );
         case 'tableFieldAfterGroup':
           // 字段 . 后面的部分
           const cursorRootStatementFieldsAfter = await reader.getFieldsFromStatement(
             parseResult.ast,
             parseResult.cursorKeyPath as any,
-            opts.onSuggestTableFields
+            opts.onSuggestTableFields,
           );
 
           return returnCompletionItemsByVersion(
@@ -154,7 +154,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
                 );
               })
               .concat(parserSuggestion),
-            opts.monacoEditorVersion
+            opts.monacoEditorVersion,
           );
         case 'tableName':
           const tableNames = await opts.onSuggestTableNames(cursorInfo as ICursorInfo<ITableInfo>);
@@ -165,7 +165,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
         default:
           return returnCompletionItemsByVersion(parserSuggestion, opts.monacoEditorVersion);
       }
-    }
+    },
   });
 
   monaco.languages.registerHoverProvider(opts.language, {
@@ -173,7 +173,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
       const parseResult: IParseResult = await asyncParser(
         editor.getValue(),
         model.getOffsetAt(position),
-        opts.parserType
+        opts.parserType,
       );
 
       const cursorInfo = await reader.getCursorInfo(parseResult.ast, parseResult.cursorKeyPath);
@@ -190,7 +190,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
             parseResult.ast,
             cursorInfo,
             opts.onSuggestTableFields,
-            parseResult.cursorKeyPath
+            parseResult.cursorKeyPath,
           );
           contents = await opts.onHoverTableField(cursorInfo.token.value, extra);
           break;
@@ -199,7 +199,7 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
             parseResult.ast,
             cursorInfo,
             opts.onSuggestTableFields,
-            parseResult.cursorKeyPath
+            parseResult.cursorKeyPath,
           );
           contents = await opts.onHoverTableField(cursorInfo.token.value, extraAfter);
           break;
@@ -215,11 +215,11 @@ export function monacoSqlAutocomplete(monaco: any, editor: any, opts?: Partial<D
       return {
         range: monaco.Range.fromPositions(
           model.getPositionAt(cursorInfo.token.position[0]),
-          model.getPositionAt(cursorInfo.token.position[1] + 1)
+          model.getPositionAt(cursorInfo.token.position[1] + 1),
         ),
-        contents
+        contents,
       };
-    }
+    },
   });
 }
 
@@ -259,7 +259,7 @@ function returnCompletionItemsByVersion(value: ICompletionItem[], monacoVersion:
       return value;
     case '0.15.6':
       return {
-        suggestions: value
+        suggestions: value,
       };
     default:
       throw Error('Not supported version');

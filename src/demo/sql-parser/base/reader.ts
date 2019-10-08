@@ -8,7 +8,7 @@ import {
   ISelectStatement,
   ISource,
   IStatement,
-  IStatements
+  IStatements,
 } from './define';
 
 export async function getCursorInfo(rootStatement: IStatements, keyPath: string[]) {
@@ -31,13 +31,13 @@ export async function getCursorInfo(rootStatement: IStatements, keyPath: string[
           type: 'tableName',
           variant: cursorKey,
           token: cursorValue,
-          tableInfo: parentStatement
+          tableInfo: parentStatement,
         };
       case 'identifier.column':
         if (cursorKey === 'name') {
           return {
             type: 'tableField',
-            token: cursorValue
+            token: cursorValue,
           };
         }
         return null;
@@ -46,12 +46,12 @@ export async function getCursorInfo(rootStatement: IStatements, keyPath: string[
         return {
           type: 'tableFieldAfterGroup',
           token: cursorValue,
-          groupName: parentStatement.groupName.value
+          groupName: parentStatement.groupName.value,
         };
       case 'function':
         return {
           type: 'functionName',
-          token: cursorValue
+          token: cursorValue,
         };
       default:
     }
@@ -61,7 +61,7 @@ export async function getCursorInfo(rootStatement: IStatements, keyPath: string[
 export function findNearestStatement(
   rootStatement: IStatements,
   keyPath: string[],
-  callback?: (value?: any) => boolean
+  callback?: (value?: any) => boolean,
 ): ISelectStatement {
   if (!rootStatement) {
     return null;
@@ -96,7 +96,7 @@ export function findNearestStatement(
 export async function getFieldsFromStatement(
   rootStatement: IStatements,
   cursorKeyPath: string[],
-  getFieldsByTableName: IGetFieldsByTableName
+  getFieldsByTableName: IGetFieldsByTableName,
 ) {
   const cursorInfo = await getCursorInfo(rootStatement, cursorKeyPath);
   const cursorRootStatement = findNearestStatement(rootStatement, cursorKeyPath);
@@ -112,7 +112,7 @@ export async function getFieldsFromStatement(
         cursorRootStatement,
         _.get(cursorRootStatement, 'from.sources', []),
         cursorInfo,
-        getFieldsByTableName
+        getFieldsByTableName,
       );
     // Join statement
     // 字段是 source 表的（自带 + join 的表）
@@ -128,7 +128,7 @@ export async function getFieldsFromStatement(
         parentSelectStatement,
         _.get(parentSelectStatement, 'from.sources', []),
         cursorInfo,
-        getFieldsByTableName
+        getFieldsByTableName,
       );
     default:
   }
@@ -140,12 +140,12 @@ async function getFieldsByFromClauses(
   rootStatement: IStatement,
   fromStatements: IStatement[],
   cursorInfo: ICursorInfo,
-  getFieldsByTableName: IGetFieldsByTableName
+  getFieldsByTableName: IGetFieldsByTableName,
 ): Promise<ICompletionItem[]> {
   const fields = await Promise.all(
     fromStatements.map(fromStatement => {
       return getFieldsByFromClause(rootStatement, fromStatement, cursorInfo, getFieldsByTableName);
-    })
+    }),
   );
 
   return _.flatten(fields).filter(item => {
@@ -157,7 +157,7 @@ async function getFieldsByFromClause(
   rootStatement: IStatement,
   fromStatement: IStatement,
   cursorInfo: ICursorInfo,
-  getFieldsByTableName: IGetFieldsByTableName
+  getFieldsByTableName: IGetFieldsByTableName,
 ): Promise<ICompletionItem[]> {
   return judgeStatement(fromStatement, async typePlusVariant => {
     switch (typePlusVariant) {
@@ -167,14 +167,14 @@ async function getFieldsByFromClause(
           rootStatement,
           (fromStatement as any).source,
           cursorInfo,
-          getFieldsByTableName
+          getFieldsByTableName,
         );
         const joinsFields = _.isArray((fromStatement as any).joins)
           ? await getFieldsByFromClauses(
               rootStatement,
               _.get(fromStatement, 'joins', []),
               cursorInfo,
-              getFieldsByTableName
+              getFieldsByTableName,
             )
           : [];
         return tableSourceFields.concat(joinsFields);
@@ -219,7 +219,7 @@ async function getFieldsByFromClause(
             // existKeyCount
             //     ? null
             //     : _.get(itFromStatement, 'alias.value') || _.get(itFromStatement, 'name.tableName.value') || null,
-            originFieldName: originField.label
+            originFieldName: originField.label,
           };
         });
         return originFields;
@@ -232,7 +232,7 @@ async function getFieldsByFromClause(
           ssFromStatement,
           ssFromStatement.from.sources,
           cursorInfo,
-          getFieldsByTableName
+          getFieldsByTableName,
         );
 
         // If select *, return all fields
@@ -268,7 +268,7 @@ async function getFieldsByFromClause(
               if (selectedField.alias) {
                 return {
                   ...field,
-                  label: selectedField.alias.value
+                  label: selectedField.alias.value,
                 };
               }
               return field;
@@ -284,7 +284,7 @@ async function getFieldsByFromClause(
           statementSelectFields = statementSelectFields.map(statementSelectField => {
             return {
               ...statementSelectField,
-              groupPickerName: _.get(ssFromStatement, 'alias.value')
+              groupPickerName: _.get(ssFromStatement, 'alias.value'),
             };
           });
         }
@@ -298,7 +298,7 @@ async function getFieldsByFromClause(
 
 async function judgeStatement<T>(
   statement: IStatement,
-  callback: (typePlusVariant?: string) => Promise<T>
+  callback: (typePlusVariant?: string) => Promise<T>,
 ): Promise<T> {
   if (!statement) {
     return null;
@@ -314,7 +314,7 @@ export async function findFieldExtraInfo(
   rootStatement: IStatements,
   cursorInfo: ICursorInfo,
   getFieldsByTableName: IGetFieldsByTableName,
-  fieldKeyPath: string[]
+  fieldKeyPath: string[],
 ): Promise<ICompletionItem> {
   const fields = await getFieldsFromStatement(rootStatement, fieldKeyPath, getFieldsByTableName);
   const field = fields.find(eachField => {

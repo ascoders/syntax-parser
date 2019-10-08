@@ -29,7 +29,7 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean, isCos
   if (!token) {
     return {
       token: null,
-      match: false
+      match: false,
     };
   }
   if (compare(token)) {
@@ -39,12 +39,12 @@ function matchToken(scanner: Scanner, compare: (token: IToken) => boolean, isCos
 
     return {
       token,
-      match: true
+      match: true,
     };
   }
   return {
     token,
-    match: false
+    match: false,
   };
 }
 
@@ -69,7 +69,7 @@ export const match = createMatch((scanner, word: string | string[], isCostToken)
     token => {
       return equalWordOrIncludeWords(token.value, word);
     },
-    isCostToken
+    isCostToken,
   );
 });
 
@@ -107,7 +107,7 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
 
         return true;
       },
-      isCostToken
+      isCostToken,
     );
   }, tokenType)();
 };
@@ -115,14 +115,14 @@ export const matchTokenType = (tokenType: string, opts: IMatchTokenTypeOption = 
 export const matchTrue = (): IMatch => {
   return {
     token: null,
-    match: true
+    match: true,
   };
 };
 
 export const matchFalse = (): IMatch => {
   return {
     token: null,
-    match: true
+    match: true,
   };
 };
 
@@ -135,7 +135,7 @@ export const optional = (...elements: IElements) => {
     chain(...elements)(ast => {
       return elements.length === 1 ? ast[0] : ast;
     }),
-    true
+    true,
   ])(ast => {
     return ast[0];
   });
@@ -151,7 +151,7 @@ export const plus = (...elements: IElements) => {
       chain(...elements)(ast => {
         return elements.length === 1 ? ast[0] : ast;
       }),
-      optional(plusFunction)
+      optional(plusFunction),
     )(ast => {
       if (ast[1]) {
         return [ast[0]].concat(ast[1]);

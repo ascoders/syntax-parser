@@ -56,7 +56,7 @@ export type ChainNodeFactory = (
   // If parent node is a function, here will get it's name.
   creatorFunction?: ChainFunction,
   parentIndex?: number,
-  parser?: Parser
+  parser?: Parser,
 ) => ChainNode;
 
 export type ChainFunction = () => ChainNodeFactory;

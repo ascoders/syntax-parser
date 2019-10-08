@@ -13,7 +13,7 @@ import {
   stringOrWord,
   stringOrWordOrNumber,
   stringSym,
-  wordSym
+  wordSym,
 } from '../base/parser';
 import { createTableName, flattenAll } from '../base/utils';
 
@@ -29,8 +29,8 @@ const statements = () => {
     many(
       chain(';', statement)(ast => {
         return ast[1];
-      })
-    )
+      }),
+    ),
   )(flattenAll);
 };
 
@@ -43,7 +43,7 @@ const statement = () => {
     setStatement,
     createIndexStatement,
     createFunctionStatement,
-    updateStatement
+    updateStatement,
   ])(ast => {
     return ast[0];
   });
@@ -58,13 +58,13 @@ const selectStatement = () => {
     optional(fromClause),
     optional(orderByClause),
     optional(limitClause),
-    optional(union, selectStatement)
+    optional(union, selectStatement),
   )(ast => {
     const result: any = {
       type: 'statement',
       variant: 'select',
       result: ast[1],
-      from: ast[2]
+      from: ast[2],
     };
 
     if (ast[5]) {
@@ -89,9 +89,9 @@ const fromClause = () => {
           sources: ast[1],
           where: ast[2],
           group: ast[3],
-          having: ast[4]
+          having: ast[4],
         };
-      }
+      },
   );
 };
 
@@ -118,20 +118,20 @@ const selectField = () => {
           // TODO: Ignore overClause
           {
             return ast[0];
-          }
+          },
         ),
-        chain('(', field, ')')()
+        chain('(', field, ')')(),
       ],
-      optional(alias)
+      optional(alias),
     )(ast => {
       return {
         type: 'identifier',
         variant: 'column',
         name: ast[1],
-        alias: ast[2]
+        alias: ast[2],
       };
     }),
-    '*'
+    '*',
   ])(ast => {
     return ast[0];
   });
@@ -155,8 +155,8 @@ const tableSources = () => {
     many(
       chain(',', tableSource)(ast => {
         return ast[1];
-      })
-    )
+      }),
+    ),
   )(flattenAll);
 };
 
@@ -166,7 +166,7 @@ const tableSource = () => {
       source: ast[0],
       joins: ast[1],
       type: 'statement',
-      variant: 'tableSource'
+      variant: 'tableSource',
     };
   });
 };
@@ -178,7 +178,7 @@ const tableSourceItem = () => {
         type: 'identifier',
         variant: 'table',
         name: ast[0],
-        alias: ast[1]
+        alias: ast[1],
       };
     }),
     chain(
@@ -186,15 +186,15 @@ const tableSourceItem = () => {
         selectStatement,
         chain('(', selectStatement, ')')(ast => {
           return ast[1];
-        })
+        }),
       ],
-      alias
+      alias,
     )(ast => {
       return {
         ...ast[0],
-        alias: ast[1]
+        alias: ast[1],
       };
-    })
+    }),
   ])(ast => {
     return ast[0];
   });
@@ -207,16 +207,16 @@ const joinPart = () => {
       'straight_join',
       chain(['inner', 'cross', 'full'], 'join')(),
       chain(['left', 'right'], optional('outer'), 'join')(),
-      chain('natural', optional(['left', 'right'], optional('outer')), 'join')()
+      chain('natural', optional(['left', 'right'], optional('outer')), 'join')(),
     ],
     tableSourceItem,
-    optional('on', expression)
+    optional('on', expression),
   )(ast => {
     return {
       type: 'statement',
       variant: 'join',
       join: ast[1],
-      conditions: ast[2]
+      conditions: ast[2],
     };
   });
 };
@@ -228,7 +228,7 @@ const alias = () => {
     chain('as', stringOrWord)(ast => {
       return ast[1];
     }),
-    stringOrWord
+    stringOrWord,
   ])(ast => {
     return ast[0];
   });
@@ -268,18 +268,18 @@ const tableName = () => {
     chain(stringOrWord)(),
     chain(stringOrWord, '.', stringOrWord)(ast => {
       return [ast[0], ast[2]];
-    })
+    }),
   ])(ast => {
     if (ast[0].length === 1) {
       return createTableName({
         namespace: null,
-        tableName: ast[0][0]
+        tableName: ast[0][0],
       });
     }
     if (ast[0].length === 2) {
       return createTableName({
         namespace: ast[0][0],
-        tableName: ast[0][1]
+        tableName: ast[0][1],
       });
     }
   });
@@ -304,9 +304,9 @@ const insertStatement = () => {
       into: {
         type: 'indentifier',
         variant: 'table',
-        name: ast[3]
+        name: ast[3],
       },
-      result: ast[5]
+      result: ast[5],
     };
   });
 };
@@ -380,7 +380,7 @@ const ifFunction = () => {
     return {
       type: 'function',
       name: 'if',
-      args: [ast[2], ast[4], ast[6]]
+      args: [ast[2], ast[4], ast[6]],
     };
   });
 };
@@ -390,7 +390,7 @@ const castFunction = () => {
     return {
       type: 'function',
       name: 'cast',
-      args: [ast[2], ast[4]]
+      args: [ast[2], ast[4]],
     };
   });
 };
@@ -400,7 +400,7 @@ const normalFunction = () => {
     return {
       type: 'function',
       name: ast[0],
-      args: ast[2]
+      args: ast[2],
     };
   });
 };
@@ -419,7 +419,7 @@ const functionFieldItem = () => {
 const caseStatement = () => {
   return chain('case', plus(caseAlternative), optional('else', [columnField, 'null']), [
     'end',
-    chain('end', 'as', wordSym)()
+    chain('end', 'as', wordSym)(),
   ])();
 };
 
@@ -467,7 +467,7 @@ const expression = () => {
 const expressionHead = () => {
   return chain(
     [chain('(', expression, ')')(), chain(notOperator, expression)(), chain(booleanPrimary)],
-    optional(chain('is', optional('not'), ['true', 'false', 'unknown'])())
+    optional(chain('is', optional('not'), ['true', 'false', 'unknown'])()),
   )(ast => {
     return ast[0];
   });
@@ -483,7 +483,7 @@ const expressionHead = () => {
 // **/
 const booleanPrimary = () => {
   return chain(predicate, many(['isnull', chain([chain('is', 'not')(), 'is', 'not'], ['null', columnField])()]))(
-    flattenAll
+    flattenAll,
   );
 };
 
@@ -500,14 +500,14 @@ const booleanPrimary = () => {
 const predicate = () => {
   return chain([
     chain(columnField, predicateAddonComparison)(),
-    chain('(', predicate, ')', predicateAddonComparison)()
+    chain('(', predicate, ')', predicateAddonComparison)(),
   ])();
 };
 
 const predicateAddonComparison = () => {
   return chain(
     optional([chain(comparisonOperator, columnField)(), chain('sounds', 'like', columnField)(), isOrNotExpression]),
-    optional(['or', predicate])
+    optional(['or', predicate]),
   )();
 };
 
@@ -516,7 +516,7 @@ const columnField = () => {
     return {
       type: 'identifier',
       variant: 'column',
-      name: ast[0]
+      name: ast[0],
     };
   });
 };
@@ -527,7 +527,7 @@ const isOrNotExpression = () => {
     chain('between', field, 'and', predicate)(),
     chain('like', field, optional('escape', field))(),
     chain('regexp', field)(),
-    'null'
+    'null',
   ])();
 };
 
@@ -550,12 +550,12 @@ const fieldItemDetail = () => {
         chain('.', '*')(ast => {
           return {
             type: 'identifier',
-            variant: 'groupAll'
+            variant: 'groupAll',
           };
         }),
         chain(':', normalFunction)(),
-        dotStringOrWordOrNumber
-      ])
+        dotStringOrWordOrNumber,
+      ]),
     )(ast => {
       if (!ast[1]) {
         return ast[0];
@@ -563,10 +563,10 @@ const fieldItemDetail = () => {
 
       return {
         ...ast[1],
-        groupName: ast[0]
+        groupName: ast[0],
       };
     }),
-    '*'
+    '*',
   ])(ast => {
     return ast[0];
   });
@@ -580,9 +580,9 @@ const dotStringOrWordOrNumber = () => {
       return {
         type: 'identifier',
         variant: 'columnAfterGroup',
-        name: ast[0]
+        name: ast[0],
       };
-    })
+    }),
   ])(ast => {
     return ast[1];
   });

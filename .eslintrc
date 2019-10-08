@@ -54,7 +54,8 @@
         "semi": true,
         "singleQuote": true,
         "tabWidth": 2,
-        "useTabs": false
+        "useTabs": false,
+        "trailingComma": "all"
       }
     ],
     "func-names": 0,
@@ -66,13 +67,15 @@
     "no-unused-expressions": 1,
     "new-cap": 2,
     "prefer-arrow-callback": 2,
-    "arrow-body-style": [
-      2,
-      "always"
-    ],
+    "arrow-body-style": 0,
     "max-len": [
       1,
-      120
+      {
+        "code": 120,
+        "ignoreStrings": true,
+        "ignoreUrls": true,
+        "ignoreRegExpLiterals": true
+      }
     ],
     "consistent-return": "off",
     "default-case": 2,
@@ -94,7 +97,7 @@
     "eol-last": 2,
     "no-useless-rename": 2,
     "class-methods-use-this": 0,
-    "prefer-destructuring": 2,
+    "prefer-destructuring": 0,
     "no-unused-vars": 0,
     "@typescript-eslint/no-unused-vars": 1,
     "react/self-closing-comp": 2,
@@ -102,6 +105,7 @@
       2,
       2
     ],
+    "no-plusplus": 0,
     "react/jsx-uses-vars": 1,
     "react/no-multi-comp": [
       2,
@@ -113,12 +117,7 @@
     "react/react-in-jsx-scope": 2,
     "react/sort-comp": 1,
     "react/jsx-tag-spacing": 2,
-    "react/jsx-no-bind": [
-      2,
-      {
-        "allowArrowFunctions": true
-      }
-    ],
+    "react/jsx-no-bind": 0,
     "react/jsx-closing-bracket-location": 2,
     "react/prefer-stateless-function": 0,
     "react/display-name": 0,
@@ -145,8 +144,14 @@
     "import/no-unresolved": 0,
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
-    "@typescript-eslint/explicit-member-accessibility": [
-      0
+    "@typescript-eslint/explicit-member-accessibility": 0,
+    "@typescript-eslint/no-object-literal-type-assertion": 0,
+    "react/no-find-dom-node": 1,
+    "no-param-reassign": [
+      2,
+      {
+        "props": false
+      }
     ]
   }
 }

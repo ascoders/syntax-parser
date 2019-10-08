@@ -59,7 +59,7 @@ class Tokenizer {
         if (token) {
           return {
             token,
-            config: eachLexer
+            config: eachLexer,
           };
         }
       }

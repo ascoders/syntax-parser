@@ -30,16 +30,16 @@ export class DefaultOpts {
           label: name,
           insertText: name,
           sortText: `A${name}`,
-          kind: this.monaco.languages.CompletionItemKind.Folder
+          kind: this.monaco.languages.CompletionItemKind.Folder,
         };
-      })
+      }),
     );
   };
 
   public onSuggestTableFields?: (
     tableInfo?: ITableInfo,
     cursorValue?: string,
-    rootStatement?: IStatement
+    rootStatement?: IStatement,
   ) => Promise<ICompletionItem[]> = tableInfo => {
     return Promise.resolve(
       ['aa', 'bb', 'cc']
@@ -51,9 +51,9 @@ export class DefaultOpts {
             label: fieldName,
             insertText: fieldName,
             sortText: `B${fieldName}`,
-            kind: this.monaco.languages.CompletionItemKind.Field
+            kind: this.monaco.languages.CompletionItemKind.Field,
           };
-        })
+        }),
     );
   };
 
@@ -72,7 +72,7 @@ export class DefaultOpts {
           documentation: 'documentation',
           detail: 'detail',
           kind: this.monaco.languages.CompletionItemKind.Keyword,
-          sortText: `W${matching.value}`
+          sortText: `W${matching.value}`,
         };
       });
   };
@@ -84,9 +84,9 @@ export class DefaultOpts {
           label: each,
           insertText: each,
           sortText: `C${each}`,
-          kind: this.monaco.languages.CompletionItemKind.Function
+          kind: this.monaco.languages.CompletionItemKind.Function,
         };
-      })
+      }),
     );
   };
 
@@ -95,7 +95,7 @@ export class DefaultOpts {
       label: tableNameOrAlias,
       insertText: tableNameOrAlias,
       sortText: `D${tableNameOrAlias}`,
-      kind: this.monaco.languages.CompletionItemKind.Folder
+      kind: this.monaco.languages.CompletionItemKind.Folder,
     };
   };
 
@@ -103,8 +103,8 @@ export class DefaultOpts {
     return Promise.resolve([
       { value: 'onHoverTableField' },
       {
-        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``
-      }
+        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``,
+      },
     ]);
   };
 
@@ -112,8 +112,8 @@ export class DefaultOpts {
     return Promise.resolve([
       { value: 'onHoverTableName' },
       {
-        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``
-      }
+        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``,
+      },
     ]);
   };
 
@@ -121,8 +121,8 @@ export class DefaultOpts {
     return Promise.resolve([
       { value: 'onHoverFunctionName' },
       {
-        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``
-      }
+        value: `\`\`\`json\n${JSON.stringify(args, null, 2)}\n\`\`\``,
+      },
     ]);
   };
 }

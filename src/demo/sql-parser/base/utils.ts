@@ -15,7 +15,7 @@ export function flattenAll(arr: any[]) {
 export function createTableName(tableNames: { [key: string]: string }) {
   const returnValue: any = {
     type: 'identifier',
-    variant: 'tableName'
+    variant: 'tableName',
   };
 
   Object.keys(tableNames).forEach(eachTableNamesKey => {

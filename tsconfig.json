@@ -14,21 +14,22 @@
       "dom",
       "es5",
       "es6",
+      "es7",
       "scripthost",
       "es2018.promise"
     ],
+    "emitDecoratorMetadata": true,
+    "preserveConstEnums": true,
     "paths": {
       "pri/*": [
         "pri",
         ".temp/types/*"
-      ],
-      "src/*": [
-        "src/*"
       ]
     }
   },
   "include": [
     ".temp/**/*",
+    "typings/**/*",
     "src/**/*"
   ],
   "exclude": [
