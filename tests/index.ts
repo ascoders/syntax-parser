@@ -25,7 +25,7 @@ sqlGroups.forEach(sqlGroup => {
     const sqlContent = fs.readFileSync(path.join(__dirname, './sqls', sqlGroup, eachSqlName)).toString();
     const sqlDetail = {
       name: eachSqlName,
-      content: sqlContent
+      content: sqlContent,
     };
     sqlTest.childs.push(sqlDetail);
   });
