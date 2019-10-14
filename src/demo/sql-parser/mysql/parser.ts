@@ -297,7 +297,7 @@ const createViewStatement = () => {
 
 // ----------------------------------- Insert statement -----------------------------------
 const insertStatement = () => {
-  return chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), [selectStatement])(ast => {
+  return chain('insert', optional('ignore'), 'into', tableName, optional(selectFieldsInfo), 'values', fieldValuesInfo)(ast => {
     return {
       type: 'statement',
       variant: 'insert',
@@ -306,7 +306,7 @@ const insertStatement = () => {
         variant: 'table',
         name: ast[3]
       },
-      result: ast[5]
+      result: ast[6]
     };
   });
 };
@@ -318,6 +318,14 @@ const selectFieldsInfo = () => {
 const selectFields = () => {
   return chain(wordSym, many(',', wordSym))();
 };
+
+const fieldValuesInfo = () => {
+  return chain('(', fieldValues, ')')();
+}
+
+const fieldValues = () => {
+  return chain([stringSym, numberSym], many(',', [stringSym, numberSym]))();
+}
 
 // ----------------------------------- groupBy -----------------------------------
 const groupByStatement = () => {
