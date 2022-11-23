@@ -1,32 +1,32 @@
 {
   "name": "syntax-parser",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "pri": {
     "type": "component"
   },
   "scripts": {
-    "start": "pri dev",
-    "docs": "pri docs",
-    "build": "pri build",
-    "preview": "pri preview",
-    "analyse": "pri analyse",
-    "test": "pri test",
+    "start": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri dev",
+    "docs": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri docs",
+    "build": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri build",
+    "preview": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri preview",
+    "analyse": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri analyse",
+    "test": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri test",
     "format": "pri lint",
     "prepublishOnly": "npm run build && npm run bundle --skipLint",
-    "bundle": "pri bundle",
+    "bundle": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri bundle",
     "release": "npm publish",
     "posttest": "codecov -f coverage/*.json -t dc6610f3-32ac-4d30-8676-74d3888349a0",
-    "publish": "pri publish",
-    "lint": "pri lint"
+    "publish": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri publish",
+    "lint": "node --max-old-space-size=16384 --max_old_space_size=16384 ./node_modules/.bin/pri lint"
   },
   "devDependencies": {
-    "pri": "^3.0.0"
+    "pri": "3.0.0"
   },
   "main": "dist/main",
   "types": "declaration/index.d.ts",
   "peerDependencies": {},
   "dependencies": {
-    "@babel/runtime": "^7.0.0"
+    "@babel/runtime": "7.7.5"
   },
   "husky": {
     "hooks": {
