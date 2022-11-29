@@ -20,12 +20,6 @@
     ],
     "emitDecoratorMetadata": true,
     "preserveConstEnums": true,
-    "paths": {
-      "pri/*": [
-        "pri",
-        ".temp/types/*"
-      ]
-    }
   },
   "include": [
     ".temp/**/*",
