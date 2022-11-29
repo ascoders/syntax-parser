@@ -27,5 +27,8 @@
     "hooks": {
       "pre-commit": "npm test"
     }
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.com/"
   }
 }
