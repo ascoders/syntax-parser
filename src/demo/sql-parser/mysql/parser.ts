@@ -67,6 +67,10 @@ const selectStatement = () => {
       from: ast[2],
     };
 
+    if(ast[3]) {
+      result.orderBy = ast[3];
+    }
+
     if (ast[5]) {
       // eslint-disable-next-line prefer-destructuring
       result.union = ast[5];
@@ -326,7 +330,9 @@ const groupByStatement = () => {
 
 // ----------------------------------- orderBy -----------------------------------
 const orderByClause = () => {
-  return chain('order', 'by', orderByExpressionList)();
+  return chain('order', 'by', orderByExpressionList)(ast=> {
+    return ast[2];
+  });
 };
 
 const orderByExpressionList = () => {
