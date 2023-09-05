@@ -1,6 +1,6 @@
 {
   "name": "syntax-parser",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "pri": {
     "type": "component"
   },
@@ -30,5 +30,8 @@
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.com/"
+  },
+  "dependencies": {
+    "pri": "^4.4.0"
   }
 }
